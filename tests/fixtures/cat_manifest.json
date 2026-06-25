@@ -1,0 +1,139 @@
+{
+  "mappingVersion": "1.2",
+  "appliesTo": ["cat_blue", "cat_brown"],
+  "coordinateSystem": "top-left pixel origin",
+  "sourceImage": {
+    "w": 1536,
+    "h": 523
+  },
+  "notes": [
+    "Raster basiert direkt auf den weißen Quadraten.",
+    "Schwarze Linien sind nur Trenner und gehoeren nicht zu den Frames.",
+    "Reihe 3 hat nur in Spalte 1 bis 5 nutzbare Frames."
+  ],
+  "grid": {
+    "columns": {
+      "1":  { "x": 0,    "w": 149 },
+      "2":  { "x": 155,  "w": 148 },
+      "3":  { "x": 308,  "w": 149 },
+      "4":  { "x": 462,  "w": 149 },
+      "5":  { "x": 616,  "w": 149 },
+      "6":  { "x": 771,  "w": 148 },
+      "7":  { "x": 925,  "w": 149 },
+      "8":  { "x": 1079, "w": 149 },
+      "9":  { "x": 1233, "w": 148 },
+      "10": { "x": 1387, "w": 149 }
+    },
+    "rows": {
+      "1": { "y": 0,   "h": 153 },
+      "2": { "y": 185, "h": 153 },
+      "3": { "y": 370, "h": 153 }
+    }
+  },
+  "frames": [
+    { "id": "F01", "row": 1, "col": 1,  "key": "idle_stand" },
+    { "id": "F02", "row": 1, "col": 2,  "key": "walk_step_1" },
+    { "id": "F03", "row": 1, "col": 3,  "key": "walk_step_2" },
+    { "id": "F04", "row": 1, "col": 4,  "key": "pounce_prep" },
+    { "id": "F05", "row": 1, "col": 5,  "key": "walk_step_3" },
+    { "id": "F06", "row": 1, "col": 6,  "key": "hop_air" },
+    { "id": "F07", "row": 1, "col": 7,  "key": "walk_step_4" },
+    { "id": "F08", "row": 1, "col": 8,  "key": "sit_front" },
+    { "id": "F09", "row": 1, "col": 9,  "key": "sit_side" },
+    { "id": "F10", "row": 1, "col": 10, "key": "stand_upright" },
+
+    { "id": "F11", "row": 2, "col": 1,  "key": "roll_back" },
+    { "id": "F12", "row": 2, "col": 2,  "key": "lie_side" },
+    { "id": "F13", "row": 2, "col": 3,  "key": "sleep_curl" },
+    { "id": "F14", "row": 2, "col": 4,  "key": "run_with_item" },
+    { "id": "F15", "row": 2, "col": 5,  "key": "idle_front_3q" },
+    { "id": "F16", "row": 2, "col": 6,  "key": "sit_front_alt" },
+    { "id": "F17", "row": 2, "col": 7,  "key": "eat_stand" },
+    { "id": "F18", "row": 2, "col": 8,  "key": "eat_walk" },
+    { "id": "F19", "row": 2, "col": 9,  "key": "eat_sit" },
+    { "id": "F20", "row": 2, "col": 10, "key": "sit_back" },
+
+    { "id": "F21", "row": 3, "col": 1, "key": "jump_long_air" },
+    { "id": "F22", "row": 3, "col": 2, "key": "jump_land" },
+    { "id": "F23", "row": 3, "col": 3, "key": "stalk_low" },
+    { "id": "F24", "row": 3, "col": 4, "key": "hiss_attack" },
+    { "id": "F25", "row": 3, "col": 5, "key": "groom_sit" }
+  ],
+  "animations": {
+    "walk": {
+      "frames": ["F01", "F02", "F03", "F05", "F07"],
+      "fps": 8,
+      "loop": true
+    },
+    "walk_stretchy": {
+      "frames": ["F01", "F02", "F03", "F04", "F05", "F07"],
+      "fps": 8,
+      "loop": true
+    },
+    "small_hop": {
+      "frames": ["F05", "F06", "F22", "F01"],
+      "fps": 10,
+      "loop": false
+    },
+    "pounce": {
+      "frames": ["F04", "F21", "F22", "F01"],
+      "fps": 10,
+      "loop": false
+    },
+    "rest_roll_to_sleep": {
+      "frames": ["F11", "F12", "F13"],
+      "fps": 5,
+      "loop": false
+    },
+    "rest_idle": {
+      "frames": ["F12", "F13"],
+      "fps": 2,
+      "loop": true
+    },
+    "eat_cycle": {
+      "frames": ["F17", "F18", "F19"],
+      "fps": 6,
+      "loop": true
+    },
+    "idle_variants": {
+      "frames": ["F01", "F08", "F09", "F10", "F15", "F16", "F20"],
+      "fps": 1,
+      "loop": true
+    },
+    "specials": {
+      "frames": ["F14", "F23", "F24", "F25"],
+      "fps": 1,
+      "loop": false
+    }
+  },
+  "frameRects": {
+    "F01":  { "x": 0,    "y": 0,   "w": 149, "h": 153 },
+    "F02":  { "x": 155,  "y": 0,   "w": 148, "h": 153 },
+    "F03":  { "x": 308,  "y": 0,   "w": 149, "h": 153 },
+    "F04":  { "x": 462,  "y": 0,   "w": 149, "h": 153 },
+    "F05":  { "x": 616,  "y": 0,   "w": 149, "h": 153 },
+    "F06":  { "x": 771,  "y": 0,   "w": 148, "h": 153 },
+    "F07":  { "x": 925,  "y": 0,   "w": 149, "h": 153 },
+    "F08":  { "x": 1079, "y": 0,   "w": 149, "h": 153 },
+    "F09":  { "x": 1233, "y": 0,   "w": 148, "h": 153 },
+    "F10":  { "x": 1387, "y": 0,   "w": 149, "h": 153 },
+
+    "F11":  { "x": 0,    "y": 185, "w": 149, "h": 153 },
+    "F12":  { "x": 155,  "y": 185, "w": 148, "h": 153 },
+    "F13":  { "x": 308,  "y": 185, "w": 149, "h": 153 },
+    "F14":  { "x": 462,  "y": 185, "w": 149, "h": 153 },
+    "F15":  { "x": 616,  "y": 185, "w": 149, "h": 153 },
+    "F16":  { "x": 771,  "y": 185, "w": 148, "h": 153 },
+    "F17":  { "x": 925,  "y": 185, "w": 149, "h": 153 },
+    "F18":  { "x": 1079, "y": 185, "w": 149, "h": 153 },
+    "F19":  { "x": 1233, "y": 185, "w": 148, "h": 153 },
+    "F20":  { "x": 1387, "y": 185, "w": 149, "h": 153 },
+
+    "F21":  { "x": 0,    "y": 370, "w": 149, "h": 153 },
+    "F22":  { "x": 155,  "y": 370, "w": 148, "h": 153 },
+    "F23":  { "x": 308,  "y": 370, "w": 149, "h": 153 },
+    "F24":  { "x": 462,  "y": 370, "w": 149, "h": 153 },
+    "F25":  { "x": 616,  "y": 370, "w": 149, "h": 153 }
+  },
+  "rectFormula": "x = grid.columns[col].x, y = grid.rows[row].y, w = grid.columns[col].w, h = grid.rows[row].h"
+}

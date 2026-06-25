@@ -124,6 +124,41 @@ def cmd_video2sprite(args):
     print(f"Done: {out}")
 
 
+def cmd_spritesheet(args):
+    from core.sprite_sheet import SpriteSheetManifest, SpriteSheet
+
+    manifest = SpriteSheetManifest.from_file(args.manifest)
+    sheet = SpriteSheet(args.image, manifest)
+
+    if args.action == "list":
+        print("Animations:")
+        for name in sheet.list_animations():
+            anim = manifest.animations[name]
+            print(f"  {name:20s}  {len(anim.frames)} frames  {anim.fps}fps  {'loop' if anim.loop else 'once'}")
+        print(f"\nFrames: {len(sheet.list_frame_ids())}")
+
+    elif args.action == "export":
+        if not args.anim:
+            print("ERROR: --anim required for export")
+            sys.exit(1)
+        out = args.output or f"{args.anim}.{args.format}"
+        if args.format == "gif":
+            result = sheet.export_animation_gif(args.anim, out)
+        else:
+            result = sheet.export_animation_sheet(args.anim, out)
+        print(f"Done: {result}")
+
+    elif args.action == "extract":
+        if not args.frame:
+            print("ERROR: --frame required for extract")
+            sys.exit(1)
+        img = sheet.extract_frame(args.frame)
+        out = args.output or f"{args.frame}.png"
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+        img.save(out)
+        print(f"Done: {out} ({img.size[0]}×{img.size[1]})")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="swift", description="SWIFT Sprite Animation AI Workflow")
     sub = parser.add_subparsers(dest="command")
@@ -161,6 +196,16 @@ def build_parser():
     p_v2s.add_argument("--colors", type=int, default=16)
     p_v2s.add_argument("--keyframes", action="store_true", help="Extract keyframes only")
 
+    # spritesheet
+    p_ss = sub.add_parser("spritesheet", help="Work with sprite sheets + manifest")
+    p_ss.add_argument("action", choices=["list", "export", "extract"])
+    p_ss.add_argument("image", help="Sprite sheet PNG path")
+    p_ss.add_argument("--manifest", required=True, help="Manifest JSON path")
+    p_ss.add_argument("--anim", help="Animation name (for export)")
+    p_ss.add_argument("--frame", help="Frame ID (for extract)")
+    p_ss.add_argument("--format", choices=["sprite_sheet", "gif"], default="gif")
+    p_ss.add_argument("--output", help="Output file path")
+
     return parser
 
 
@@ -177,6 +222,7 @@ def main():
         "analyze": cmd_analyze,
         "mocap": cmd_mocap,
         "video2sprite": cmd_video2sprite,
+        "spritesheet": cmd_spritesheet,
     }
     dispatch[args.command](args)
 
