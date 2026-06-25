@@ -37,6 +37,8 @@ def parse_args():
     parser.add_argument("--camera-angle", choices=["front", "side", "three-quarter"], default="front")
     parser.add_argument("--pixel-size", type=int, default=4, help="Pixel art block size for post-process")
     parser.add_argument("--meta", default=None, help="Output path for metadata JSON")
+    parser.add_argument("--lock-root-motion", action="store_true",
+                        help="Lock root bone XZ position (use with _RM animations)")
     return parser.parse_args(argv)
 
 
@@ -95,6 +97,24 @@ def setup_flat_lighting():
     light_obj = bpy.data.objects.new("SWIFT_Light", light_data)
     bpy.context.scene.collection.objects.link(light_obj)
     light_obj.location = (2, -2, 4)
+
+
+def lock_root_bone(char_objects):
+    """Lock root bone XZ to keep character centered during _RM animation render."""
+    if not BLENDER:
+        return
+    root_names = {"root", "root_motion", "hips", "pelvis"}
+    for obj in char_objects:
+        if obj.type != "ARMATURE":
+            continue
+        for bone in obj.data.bones:
+            if bone.name.lower() in root_names:
+                pose_bone = obj.pose.bones.get(bone.name)
+                if pose_bone:
+                    c = pose_bone.constraints.new("LIMIT_LOCATION")
+                    c.use_min_x = c.use_max_x = True
+                    c.use_min_z = c.use_max_z = True
+                break
 
 
 def apply_animation(char_objects, anim_path):
@@ -165,6 +185,8 @@ def main():
 
     char_objects = import_fbx(args.fbx)
     apply_animation(char_objects, args.anim)
+    if args.lock_root_motion:
+        lock_root_bone(char_objects)
 
     setup_flat_lighting()
     setup_orthographic_camera(args.camera_angle)
