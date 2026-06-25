@@ -2,7 +2,7 @@
 import os
 import tempfile
 import pytest
-from core.anim_library import AnimLibrary, AnimEntry, _detect_source, _file_id
+from core.anim_library import AnimLibrary, AnimEntry, _detect_source, _file_id, has_root_motion
 
 
 def _make_fake_fbx(dir_path, name):
@@ -24,6 +24,29 @@ class TestDetectSource:
 
     def test_unknown(self):
         assert _detect_source("/some/random/path/spin.fbx") == "unknown"
+
+    def test_quaternius_ual_path(self):
+        assert _detect_source("/quaternius/UAL1_Standard_RM.fbx") == "quaternius"
+
+    def test_quaternius_ual_stem(self):
+        assert _detect_source("/anims/UAL2_Standard_RM.fbx") == "quaternius"
+
+    def test_quaternius_ual_standard(self):
+        assert _detect_source("/anims/UAL1_Standard.fbx") == "quaternius"
+
+
+class TestHasRootMotion:
+    def test_rm_suffix_true(self):
+        assert has_root_motion("UAL1_Standard_RM.fbx") is True
+
+    def test_no_suffix_false(self):
+        assert has_root_motion("walk.fbx") is False
+
+    def test_case_insensitive(self):
+        assert has_root_motion("Walk_rm.fbx") is True
+
+    def test_standard_no_rm(self):
+        assert has_root_motion("UAL1_Standard.fbx") is False
 
 
 class TestAnimLibrary:
@@ -106,3 +129,17 @@ class TestAnimLibrary:
         lib = AnimLibrary()
         lib.add_folder(str(tmp_path), recursive=True)
         assert lib.count() == 1
+
+    def test_root_motion_detected(self, tmp_path):
+        p = _make_fake_fbx(str(tmp_path), "Walk_RM.fbx")
+        lib = AnimLibrary()
+        lib.add_file(p)
+        entry = lib.all()[0]
+        assert entry.root_motion is True
+
+    def test_no_root_motion(self, tmp_path):
+        p = _make_fake_fbx(str(tmp_path), "walk.fbx")
+        lib = AnimLibrary()
+        lib.add_file(p)
+        entry = lib.all()[0]
+        assert entry.root_motion is False

@@ -13,12 +13,17 @@ from typing import Optional
 SUPPORTED_EXTENSIONS = {".fbx", ".bvh"}
 
 SOURCE_TYPES = {
-    "mixamo": "Mixamo",
-    "kenney": "Kenney",
-    "unreal": "Unreal Engine",
-    "mocap": "Motion Capture",
-    "unknown": "Unknown",
+    "mixamo":     "Mixamo",
+    "kenney":     "Kenney",
+    "quaternius": "Quaternius (CC0)",
+    "unreal":     "Unreal Engine",
+    "mocap":      "Motion Capture",
+    "unknown":    "Unknown",
 }
+
+# UAL filenames follow the pattern UAL<n>_<variant>_RM.fbx or UAL<n>_<variant>.fbx
+# "_RM" suffix means root motion is baked into every animation track.
+HAS_ROOT_MOTION_SUFFIX = "_rm"
 
 
 def _detect_source(path: str) -> str:
@@ -27,11 +32,22 @@ def _detect_source(path: str) -> str:
         return "mixamo"
     if "kenney" in lower:
         return "kenney"
+    if "quaternius" in lower or lower.startswith("ual") or "/ual" in lower:
+        return "quaternius"
+    # UAL files named directly (e.g. UAL1_Standard_RM.fbx at repo root)
+    stem = Path(path).stem.lower()
+    if stem.startswith("ual"):
+        return "quaternius"
     if "unreal" in lower or "ue4" in lower or "ue5" in lower:
         return "unreal"
     if "mocap" in lower or "capture" in lower:
         return "mocap"
     return "unknown"
+
+
+def has_root_motion(path: str) -> bool:
+    """Return True if the filename indicates root motion is baked in (_RM suffix)."""
+    return Path(path).stem.lower().endswith(HAS_ROOT_MOTION_SUFFIX)
 
 
 def _file_id(path: str) -> str:
@@ -45,6 +61,7 @@ class AnimEntry:
     path: str
     ext: str
     source: str
+    root_motion: bool = False
     thumbnail: Optional[str] = None
     tags: list = field(default_factory=list)
 
@@ -94,6 +111,7 @@ class AnimLibrary:
             path=path,
             ext=Path(path).suffix.lower(),
             source=_detect_source(path),
+            root_motion=has_root_motion(path),
         )
         self._entries[entry_id] = entry
 
