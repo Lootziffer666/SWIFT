@@ -61,6 +61,35 @@ def export_sprite_sheet(
     return out_path
 
 
+def export_depth_sheet(
+    depth_frame_paths: list[str],
+    out_path: str,
+    columns: Optional[int] = None,
+    padding: int = 0,
+) -> str:
+    """Pack depth frames (8-bit grayscale) into a sprite sheet."""
+    if not depth_frame_paths:
+        raise ValueError("No depth frames to export")
+
+    # Load as grayscale (L mode)
+    depth_frames = []
+    for p in depth_frame_paths:
+        img = Image.open(p).convert("L")  # 8-bit grayscale
+        depth_frames.append(img)
+
+    rects, (sheet_w, sheet_h), _ = _compute_frame_layout(
+        depth_frames[0].size, len(depth_frames), columns, padding
+    )
+    sheet = Image.new("L", (sheet_w, sheet_h), 0)  # Black background
+
+    for frame, (x, y, _fw, _fh) in zip(depth_frames, rects):
+        sheet.paste(frame, (x, y))
+
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    sheet.save(out_path, "PNG")
+    return out_path
+
+
 def export_manifest(
     frame_paths: list[str],
     out_path: str,
@@ -70,11 +99,13 @@ def export_manifest(
     columns: Optional[int] = None,
     padding: int = 0,
     depth_image: Optional[str] = None,
+    depth_frame_paths: Optional[list[str]] = None,
 ) -> str:
-    """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema)
+    """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema v1.4.0+)
     describing the layout export_sprite_sheet() packs these same frames into.
     Consumable by core.sprite_sheet.SpriteSheetManifest and by SHADED's actor
-    loader. Optionally includes depthImage path for spatial rendering."""
+    loader. Optionally includes depthImage path and depthFrameRects for spatial
+    rendering via depth-layer ordering."""
     if not frame_paths:
         raise ValueError("No frames to export")
 
@@ -83,7 +114,7 @@ def export_manifest(
     frame_ids = [f"F{i + 1:02d}" for i in range(len(frames))]
 
     manifest = {
-        "mappingVersion": "1.0",
+        "mappingVersion": "1.4.0",
         "appliesTo": [os.path.splitext(os.path.basename(out_path))[0]],
         "sourceImage": {"w": sheet_w, "h": sheet_h},
         "frameRects": {
@@ -98,8 +129,27 @@ def export_manifest(
             anim_name: {"frames": frame_ids, "fps": fps, "loop": loop}
         },
     }
+
+    # Add depth information if provided
     if depth_image:
         manifest["depthImage"] = depth_image
+
+    if depth_frame_paths:
+        # Depth frames use same layout as color frames
+        if len(depth_frame_paths) != len(frame_paths):
+            raise ValueError(
+                f"Depth frame count ({len(depth_frame_paths)}) "
+                f"must match color frame count ({len(frame_paths)})"
+            )
+        depth_frames = _load_frames(depth_frame_paths)
+        depth_rects, (depth_w, depth_h), _ = _compute_frame_layout(
+            depth_frames[0].size, len(depth_frames), columns, padding
+        )
+        manifest["depthFrameRects"] = {
+            fid: {"x": x, "y": y, "w": w, "h": h}
+            for fid, (x, y, w, h) in zip(frame_ids, depth_rects)
+        }
+        manifest["depthSourceImage"] = {"w": depth_w, "h": depth_h}
 
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w") as f:
@@ -225,12 +275,19 @@ def export_gif_from_images(
 
 
 class Exporter:
-    def __init__(self, frame_paths: list[str], fps: int = 12):
+    def __init__(self, frame_paths: list[str], fps: int = 12, depth_frame_paths: Optional[list[str]] = None):
         self.frame_paths = frame_paths
+        self.depth_frame_paths = depth_frame_paths or []
         self.fps = fps
 
     def to_sprite_sheet(self, out_path: str, columns: Optional[int] = None, padding: int = 0) -> str:
         return export_sprite_sheet(self.frame_paths, out_path, columns, padding)
+
+    def to_depth_sheet(self, out_path: str, columns: Optional[int] = None, padding: int = 0) -> str:
+        """Export depth frames as grayscale sprite sheet."""
+        if not self.depth_frame_paths:
+            raise ValueError("No depth frames available")
+        return export_depth_sheet(self.depth_frame_paths, out_path, columns, padding)
 
     def to_gif(self, out_path: str, loop: int = 0) -> str:
         return export_gif(self.frame_paths, out_path, self.fps, loop)
@@ -238,5 +295,20 @@ class Exporter:
     def to_frames_json(self, out_dir: str, animation_name: str = "animation") -> str:
         return export_frames_with_metadata(self.frame_paths, out_dir, self.fps, animation_name)
 
-    def to_manifest(self, out_path: str, animation_name: str = "animation", loop: bool = True, depth_image: Optional[str] = None) -> str:
-        return export_manifest(self.frame_paths, out_path, animation_name, self.fps, loop, depth_image=depth_image)
+    def to_manifest(
+        self,
+        out_path: str,
+        animation_name: str = "animation",
+        loop: bool = True,
+        depth_image: Optional[str] = None,
+    ) -> str:
+        """Export manifest with optional depth frame metadata."""
+        return export_manifest(
+            self.frame_paths,
+            out_path,
+            animation_name,
+            self.fps,
+            loop,
+            depth_image=depth_image,
+            depth_frame_paths=self.depth_frame_paths if self.depth_frame_paths else None,
+        )
