@@ -17,6 +17,28 @@ def _load_frames(frame_paths: list[str]) -> list[Image.Image]:
     return frames
 
 
+def _compute_frame_layout(
+    frame_size: tuple,
+    count: int,
+    columns: Optional[int] = None,
+    padding: int = 0,
+) -> tuple:
+    """Compute frame rects + sheet size for a grid packing of `count` equal-sized
+    frames. Shared by export_sprite_sheet/export_sprite_sheet_from_images and
+    export_manifest so the manifest's frameRects always match the packed sheet."""
+    fw, fh = frame_size
+    cols = columns or count  # default: single row
+    rows = (count + cols - 1) // cols
+    sheet_w = cols * (fw + padding) - padding
+    sheet_h = rows * (fh + padding) - padding
+    rects = []
+    for i in range(count):
+        col = i % cols
+        row = i // cols
+        rects.append((col * (fw + padding), row * (fh + padding), fw, fh))
+    return rects, (sheet_w, sheet_h), cols
+
+
 def export_sprite_sheet(
     frame_paths: list[str],
     out_path: str,
@@ -28,24 +50,57 @@ def export_sprite_sheet(
         raise ValueError("No frames to export")
 
     frames = _load_frames(frame_paths)
-    fw, fh = frames[0].size
-    count = len(frames)
-    cols = columns or count  # default: single row
-    rows = (count + cols - 1) // cols
-
-    sheet_w = cols * (fw + padding) - padding
-    sheet_h = rows * (fh + padding) - padding
+    rects, (sheet_w, sheet_h), _ = _compute_frame_layout(frames[0].size, len(frames), columns, padding)
     sheet = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
 
-    for i, frame in enumerate(frames):
-        col = i % cols
-        row = i // cols
-        x = col * (fw + padding)
-        y = row * (fh + padding)
+    for frame, (x, y, _fw, _fh) in zip(frames, rects):
         sheet.paste(frame, (x, y))
 
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     sheet.save(out_path, "PNG")
+    return out_path
+
+
+def export_manifest(
+    frame_paths: list[str],
+    out_path: str,
+    anim_name: str = "animation",
+    fps: int = 12,
+    loop: bool = True,
+    columns: Optional[int] = None,
+    padding: int = 0,
+) -> str:
+    """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema)
+    describing the layout export_sprite_sheet() packs these same frames into.
+    Consumable by core.sprite_sheet.SpriteSheetManifest and by SHADED's actor
+    loader."""
+    if not frame_paths:
+        raise ValueError("No frames to export")
+
+    frames = _load_frames(frame_paths)
+    rects, (sheet_w, sheet_h), cols = _compute_frame_layout(frames[0].size, len(frames), columns, padding)
+    frame_ids = [f"F{i + 1:02d}" for i in range(len(frames))]
+
+    manifest = {
+        "mappingVersion": "1.0",
+        "appliesTo": [os.path.splitext(os.path.basename(out_path))[0]],
+        "sourceImage": {"w": sheet_w, "h": sheet_h},
+        "frameRects": {
+            fid: {"x": x, "y": y, "w": w, "h": h}
+            for fid, (x, y, w, h) in zip(frame_ids, rects)
+        },
+        "frames": [
+            {"id": fid, "row": i // cols + 1, "col": i % cols + 1, "key": fid}
+            for i, fid in enumerate(frame_ids)
+        ],
+        "animations": {
+            anim_name: {"frames": frame_ids, "fps": fps, "loop": loop}
+        },
+    }
+
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w") as f:
+        json.dump(manifest, f, indent=2)
     return out_path
 
 
@@ -179,3 +234,6 @@ class Exporter:
 
     def to_frames_json(self, out_dir: str, animation_name: str = "animation") -> str:
         return export_frames_with_metadata(self.frame_paths, out_dir, self.fps, animation_name)
+
+    def to_manifest(self, out_path: str, animation_name: str = "animation", loop: bool = True) -> str:
+        return export_manifest(self.frame_paths, out_path, animation_name, self.fps, loop)

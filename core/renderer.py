@@ -68,6 +68,7 @@ class Renderer:
         export_format: str = "sprite_sheet",
         style: Optional[StyleParams] = None,
         progress_cb: Optional[Callable[[str], None]] = None,
+        anim_name: Optional[str] = None,
     ) -> str:
         result = self.render(char_fbx, anim_fbx, style=style, progress_cb=progress_cb)
         if not result.success:
@@ -77,7 +78,10 @@ class Renderer:
         out = export_path or os.path.join(result.frames_dir, "output")
 
         if export_format == "sprite_sheet":
-            return exporter.to_sprite_sheet(out + ".png")
+            sheet_path = exporter.to_sprite_sheet(out + ".png")
+            name = anim_name or os.path.splitext(os.path.basename(anim_fbx or char_fbx))[0]
+            exporter.to_manifest(out + "_manifest.json", animation_name=name)
+            return sheet_path
         elif export_format == "gif":
             return exporter.to_gif(out + ".gif")
         elif export_format == "frames_json":

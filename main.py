@@ -40,6 +40,7 @@ def cmd_render(args):
         export_format=args.format,
         style=style,
         progress_cb=progress,
+        anim_name=args.anim_name,
     )
     print(f"Done: {out}")
 
@@ -175,6 +176,7 @@ def build_parser():
     p_render.add_argument("--camera", choices=["front", "side", "three-quarter"], default="front")
     p_render.add_argument("--pixel-size", type=int, default=4)
     p_render.add_argument("--blender", help="Path to Blender executable")
+    p_render.add_argument("--anim-name", help="Animation key for the generated manifest (default: anim/model filename)")
 
     # analyze
     p_analyze = sub.add_parser("analyze", help="Extract style params from a reference sheet")
