@@ -56,6 +56,7 @@ class RenderJob:
     camera_angle: str = "front"
     pixel_size: int = 4
     blender_path: Optional[str] = None
+    enable_depth: bool = False  # Enable Z-buffer depth pass
 
     def validate(self):
         if not os.path.isfile(self.char_fbx):
@@ -70,6 +71,7 @@ class RenderResult:
     frames_dir: str
     frame_count: int
     frame_paths: list = field(default_factory=list)
+    depth_frame_paths: list = field(default_factory=list)  # Depth pass frames (8-bit grayscale)
     metadata: dict = field(default_factory=dict)
     error: Optional[str] = None
 
@@ -77,6 +79,13 @@ class RenderResult:
         """Return sorted list of frame PNG paths."""
         return sorted(
             p for p in self.frame_paths
+            if p.endswith(".png")
+        )
+
+    def depth_frames(self):
+        """Return sorted list of depth frame PNG paths."""
+        return sorted(
+            p for p in self.depth_frame_paths
             if p.endswith(".png")
         )
 
@@ -116,6 +125,8 @@ class BlenderBridge:
             cmd += ["--anim", job.anim_fbx]
         if job.frame_end is not None:
             cmd += ["--end", str(job.frame_end)]
+        if job.enable_depth:
+            cmd += ["--depth-pass"]
 
         try:
             proc = subprocess.Popen(
@@ -148,11 +159,19 @@ class BlenderBridge:
             frames = sorted(
                 str(p) for p in Path(out_dir).glob("frame_*.png")
             )
+            depth_frames = []
+            if job.enable_depth:
+                depth_dir = os.path.join(out_dir, "depth")
+                depth_frames = sorted(
+                    str(p) for p in Path(depth_dir).glob("frame_*_depth.png")
+                ) if os.path.isdir(depth_dir) else []
+
             return RenderResult(
                 success=True,
                 frames_dir=out_dir,
                 frame_count=len(frames),
                 frame_paths=frames,
+                depth_frame_paths=depth_frames,
                 metadata=meta,
             )
 
