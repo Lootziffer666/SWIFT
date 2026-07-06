@@ -39,6 +39,9 @@ class SpriteSheetManifest:
         self.animations: dict[str, AnimationDef] = {}
         self.applies_to: list[str] = []
         self.depth_image: Optional[str] = None     # optional path to depth map PNG
+        self.depth_frame_rects: dict[str, tuple] = {}  # id → (x, y, w, h) for depth frames
+        self.depth_source_w: int = 0               # depth map source width
+        self.depth_source_h: int = 0               # depth map source height
 
     @classmethod
     def from_file(cls, path: str) -> "SpriteSheetManifest":
@@ -54,6 +57,11 @@ class SpriteSheetManifest:
         m.source_h = src.get("h", 0)
         m.applies_to = data.get("appliesTo", [])
         m.depth_image = data.get("depthImage")
+
+        # Parse depth image dimensions (optional)
+        depth_src = data.get("depthSourceImage", {})
+        m.depth_source_w = depth_src.get("w", 0)
+        m.depth_source_h = depth_src.get("h", 0)
 
         # Build frame id → key map
         for f in data.get("frames", []):
@@ -72,6 +80,14 @@ class SpriteSheetManifest:
                     m.frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
         else:
             m._compute_from_grid(data, m.frame_ids, data.get("frames", []))
+
+        # Resolve depth frame rects (if present)
+        depth_rects = data.get("depthFrameRects", {})
+        if depth_rects:
+            for fid in m.frame_ids:
+                r = depth_rects.get(fid)
+                if r:
+                    m.depth_frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
 
         # Parse animations
         for anim_name, anim_data in data.get("animations", {}).items():
