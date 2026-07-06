@@ -67,9 +67,53 @@ def cmd_render(args):
     if args.variants:
         print(f"\nGenerating palette variants: {args.variants}")
         from core.procedural.palette_swap import Palette, PaletteSwapper
+        from PIL import Image
+
         variants_list = [v.strip() for v in args.variants.split(",")]
-        # TODO: Implement variant generation with palette definitions
-        print(f"  Variants requested but not yet fully integrated: {variants_list}")
+
+        # Load base sprite sheet
+        base_sheet_path = out if out.endswith('.png') else out + '.png'
+        if not os.path.exists(base_sheet_path):
+            print(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
+        else:
+            base_sheet = Image.open(base_sheet_path)
+            variant_data = {}
+
+            # Predefined variant palettes (simple RGB shifts)
+            PRESET_PALETTES = {
+                'red': Palette.from_hex_map({'#4169E1': '#FF6347', '#6495ED': '#FF4500', '#1E90FF': '#DC143C'}),  # Blue→Red
+                'green': Palette.from_hex_map({'#4169E1': '#228B22', '#6495ED': '#32CD32', '#1E90FF': '#00AA00'}),  # Blue→Green
+                'purple': Palette.from_hex_map({'#4169E1': '#9932CC', '#6495ED': '#DA70D6', '#1E90FF': '#8A2BE2'}),  # Blue→Purple
+                'gold': Palette.from_hex_map({'#4169E1': '#FFD700', '#6495ED': '#FFA500', '#1E90FF': '#FF8C00'}),   # Blue→Gold
+            }
+
+            for variant_name in variants_list:
+                if variant_name not in PRESET_PALETTES:
+                    print(f"  ⚠️ Unknown variant: {variant_name} (skip)")
+                    continue
+
+                palette = PRESET_PALETTES[variant_name]
+                swapper = PaletteSwapper(palette)
+                variant_sheet = swapper.remap_frame(base_sheet)
+
+                variant_path = out.replace('.png', f'_{variant_name}.png')
+                variant_sheet.save(variant_path, 'PNG')
+                variant_data[variant_name] = {
+                    'path': os.path.basename(variant_path),
+                    'palette': variant_name
+                }
+                print(f"  ✓ {variant_name}: {variant_path}")
+
+            # Update manifest with variant metadata (if manifest exists)
+            manifest_path = out.replace('.png', '_manifest.json')
+            if os.path.exists(manifest_path) and variant_data:
+                import json
+                with open(manifest_path, 'r') as f:
+                    manifest = json.load(f)
+                manifest['variants'] = [{'name': k, 'path': v['path']} for k, v in variant_data.items()]
+                with open(manifest_path, 'w') as f:
+                    json.dump(manifest, f, indent=2)
+                print(f"  ✓ Manifest updated with {len(variant_data)} variants")
 
 
 def cmd_analyze(args):
