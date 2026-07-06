@@ -38,6 +38,7 @@ class SpriteSheetManifest:
         self.key_to_id: dict[str, str] = {}        # semantic key → id
         self.animations: dict[str, AnimationDef] = {}
         self.applies_to: list[str] = []
+        self.depth_image: Optional[str] = None     # optional path to depth map PNG
 
     @classmethod
     def from_file(cls, path: str) -> "SpriteSheetManifest":
@@ -52,6 +53,7 @@ class SpriteSheetManifest:
         m.source_w = src.get("w", 0)
         m.source_h = src.get("h", 0)
         m.applies_to = data.get("appliesTo", [])
+        m.depth_image = data.get("depthImage")
 
         # Build frame id → key map
         for f in data.get("frames", []):

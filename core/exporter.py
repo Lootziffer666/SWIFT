@@ -69,11 +69,12 @@ def export_manifest(
     loop: bool = True,
     columns: Optional[int] = None,
     padding: int = 0,
+    depth_image: Optional[str] = None,
 ) -> str:
     """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema)
     describing the layout export_sprite_sheet() packs these same frames into.
     Consumable by core.sprite_sheet.SpriteSheetManifest and by SHADED's actor
-    loader."""
+    loader. Optionally includes depthImage path for spatial rendering."""
     if not frame_paths:
         raise ValueError("No frames to export")
 
@@ -97,6 +98,8 @@ def export_manifest(
             anim_name: {"frames": frame_ids, "fps": fps, "loop": loop}
         },
     }
+    if depth_image:
+        manifest["depthImage"] = depth_image
 
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w") as f:
@@ -235,5 +238,5 @@ class Exporter:
     def to_frames_json(self, out_dir: str, animation_name: str = "animation") -> str:
         return export_frames_with_metadata(self.frame_paths, out_dir, self.fps, animation_name)
 
-    def to_manifest(self, out_path: str, animation_name: str = "animation", loop: bool = True) -> str:
-        return export_manifest(self.frame_paths, out_path, animation_name, self.fps, loop)
+    def to_manifest(self, out_path: str, animation_name: str = "animation", loop: bool = True, depth_image: Optional[str] = None) -> str:
+        return export_manifest(self.frame_paths, out_path, animation_name, self.fps, loop, depth_image=depth_image)
