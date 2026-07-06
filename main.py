@@ -11,6 +11,22 @@ import sys
 def cmd_render(args):
     from core.renderer import Renderer, RendererConfig, StyleParams
 
+    # Phase 3: Handle procedural skeleton generation
+    if args.skeleton_generator:
+        from core.procedural.skeleton_generator import SkeletonParams, SkeletonGenerator
+        print(f"Generating procedural skeleton (height={args.height_cm}cm, weight={args.weight_kg}kg)...")
+        params = SkeletonParams(
+            height_cm=args.height_cm,
+            weight_kg=args.weight_kg,
+            with_ik=args.with_ik,
+            with_mesh_bodies=args.mesh_bodies,
+        )
+        generator = SkeletonGenerator()
+        result = generator.generate(params, export_fbx=args.model)
+        print(f"  Skeleton: {result['metadata']['total_joints']} joints")
+        if result['fbx_path']:
+            print(f"  FBX exported to: {result['fbx_path']}")
+
     config = RendererConfig(blender_path=args.blender)
     renderer = Renderer(config)
 
@@ -26,6 +42,7 @@ def cmd_render(args):
         fps=args.fps,
         camera_angle=args.camera,
         pixel_size=args.pixel_size,
+        enable_depth=args.depth_pass,
     )
 
     def progress(line):
@@ -33,6 +50,8 @@ def cmd_render(args):
             print(f"  {line}")
 
     print(f"Rendering {args.model} + {args.anim or 'built-in animation'}...")
+    if args.depth_pass:
+        print("  (with depth pass enabled)")
     out = renderer.render_and_export(
         char_fbx=args.model,
         anim_fbx=args.anim,
@@ -43,6 +62,14 @@ def cmd_render(args):
         anim_name=args.anim_name,
     )
     print(f"Done: {out}")
+
+    # Phase 3: Handle palette variants
+    if args.variants:
+        print(f"\nGenerating palette variants: {args.variants}")
+        from core.procedural.palette_swap import Palette, PaletteSwapper
+        variants_list = [v.strip() for v in args.variants.split(",")]
+        # TODO: Implement variant generation with palette definitions
+        print(f"  Variants requested but not yet fully integrated: {variants_list}")
 
 
 def cmd_analyze(args):
@@ -177,6 +204,16 @@ def build_parser():
     p_render.add_argument("--pixel-size", type=int, default=4)
     p_render.add_argument("--blender", help="Path to Blender executable")
     p_render.add_argument("--anim-name", help="Animation key for the generated manifest (default: anim/model filename)")
+    # Phase 3: Procedural character generation
+    p_render.add_argument("--skeleton-generator", action="store_true", help="Generate procedural skeleton from parameters")
+    p_render.add_argument("--height-cm", type=float, default=170.0, help="Character height in cm (for scaling)")
+    p_render.add_argument("--weight-kg", type=float, default=70.0, help="Character weight in kg")
+    p_render.add_argument("--with-ik", action="store_true", help="Apply 2-bone IK chains to limbs")
+    p_render.add_argument("--mesh-bodies", action="store_true", help="Generate capsule mesh bodies for each bone")
+    # Phase 3: Depth rendering
+    p_render.add_argument("--depth-pass", action="store_true", help="Enable Z-buffer depth pass (8-bit grayscale)")
+    # Phase 3: Palette variants
+    p_render.add_argument("--variants", help="Comma-separated palette variant names (e.g. 'red,blue,green')")
 
     # analyze
     p_analyze = sub.add_parser("analyze", help="Extract style params from a reference sheet")
