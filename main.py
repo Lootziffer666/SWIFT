@@ -159,6 +159,52 @@ def cmd_spritesheet(args):
         print(f"Done: {out} ({img.size[0]}×{img.size[1]})")
 
 
+def cmd_critter(args):
+    from core.critter.evolution import Skeleton, morph, breed
+    from core.critter.flow_field import FlowField, FlowFieldConfig, NPC
+    from core.critter.ik import fabrik_solve, BoneChain
+    from core.critter.geometry import Vec3
+
+    print("Critter Crosser engine demo")
+
+    # Procedural evolution: larva -> adult morph.
+    larva = Skeleton(
+        segment_widths=[0.2] * 4, segment_heights=[0.2] * 4,
+        segment_lengths=[0.3] * 4, eye_count=2, limb_count=0, segment_count=4,
+    )
+    adult = Skeleton(
+        segment_widths=[0.6] * 8, segment_heights=[0.6] * 8,
+        segment_lengths=[0.8] * 8, eye_count=2, limb_count=4, segment_count=8,
+    )
+    grown = morph(larva, adult, args.evolution)
+    print(f"  Morphed critter @ {args.evolution:.0%}: "
+          f"{grown.segment_count} segments, length {grown.normalised_length():.2f}")
+
+    # Breeding two parents.
+    child = breed(adult, grown, mutation_rate=args.mutation)
+    print(f"  Bred offspring: {child.limb_count} limbs, {child.eye_count} eyes")
+
+    # Flow-field navigation for a crowd.
+    cfg = FlowFieldConfig(width=args.grid, height=1)
+    field = FlowField(cfg)
+    field.compute([(args.grid - 1, 0)])
+    npcs = [NPC(id=i, x=0, y=0, on_screen=False) for i in range(args.npcs)]
+    for _ in range(args.steps):
+        for npc in npcs:
+            npc.update(field, speed=1.0, dt=1.0)
+    arrived = sum(1 for n in npcs if n.x >= args.grid - 2)
+    print(f"  Flow-field NPCs: {arrived}/{len(npcs)} reached the goal "
+          f"({field.memory_bytes()} bytes for the field)")
+
+    # IK reach test.
+    chain = BoneChain(
+        joints=[Vec3(0, 0, 0), Vec3(1, 0, 0), Vec3(2, 0, 0), Vec3(3, 0, 0)],
+        lengths=[1.0, 1.0, 1.0],
+    )
+    fabrik_solve(chain, Vec3(0, 0, 2.9), iterations=40)
+    print(f"  FABRIK end-effector error: {chain.end.distance_to(Vec3(0, 0, 2.9)):.4f}")
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="swift", description="SWIFT Sprite Animation AI Workflow")
     sub = parser.add_subparsers(dest="command")
@@ -206,6 +252,14 @@ def build_parser():
     p_ss.add_argument("--format", choices=["sprite_sheet", "gif"], default="gif")
     p_ss.add_argument("--output", help="Output file path")
 
+    # critter
+    p_critter = sub.add_parser("critter", help="Run the Critter Crosser engine demo")
+    p_critter.add_argument("--evolution", type=float, default=0.5, help="Morph t (0=larva,1=adult)")
+    p_critter.add_argument("--mutation", type=float, default=0.05, help="Breeding mutation rate")
+    p_critter.add_argument("--npcs", type=int, default=200, help="Number of flow-field NPCs")
+    p_critter.add_argument("--grid", type=int, default=40, help="Flow-field grid width")
+    p_critter.add_argument("--steps", type=int, default=60, help="Simulation steps")
+
     return parser
 
 
@@ -223,6 +277,7 @@ def main():
         "mocap": cmd_mocap,
         "video2sprite": cmd_video2sprite,
         "spritesheet": cmd_spritesheet,
+        "critter": cmd_critter,
     }
     dispatch[args.command](args)
 
