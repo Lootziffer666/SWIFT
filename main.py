@@ -205,6 +205,11 @@ def cmd_critter(args):
     print(f"  FABRIK end-effector error: {chain.end.distance_to(Vec3(0, 0, 2.9)):.4f}")
 
 
+def cmd_gui(args):
+    from gui.app import run_studio
+    run_studio(seed=args.seed)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="swift", description="SWIFT Sprite Animation AI Workflow")
     sub = parser.add_subparsers(dest="command")
@@ -260,6 +265,10 @@ def build_parser():
     p_critter.add_argument("--grid", type=int, default=40, help="Flow-field grid width")
     p_critter.add_argument("--steps", type=int, default=60, help="Simulation steps")
 
+    # gui
+    p_gui = sub.add_parser("gui", help="Launch the Critter Crosser Studio GUI")
+    p_gui.add_argument("--seed", type=int, default=1, help="Random seed for the studio")
+
     return parser
 
 
@@ -278,6 +287,7 @@ def main():
         "video2sprite": cmd_video2sprite,
         "spritesheet": cmd_spritesheet,
         "critter": cmd_critter,
+        "gui": cmd_gui,
     }
     dispatch[args.command](args)
 

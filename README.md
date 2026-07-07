@@ -32,3 +32,22 @@ python main.py critter --npcs 400 --grid 60 --steps 100
 ```bash
 pytest tests/test_critter_*.py -v
 ```
+
+## Studio GUI
+
+A live, interactive studio (PySide6 — already in `requirements.txt`) lets you
+*see what happens and intervene* in real time:
+
+```bash
+python main.py gui
+```
+
+Layout:
+- **Center viewport** — creatures (SDF body spheres), the IK limb chain, and the wobbly-tower trunk. **Drag the red handle** to move the IK end-effector target.
+- **Flow Field view** — 1-byte/tile field with NPC dots and the goal marker. **Left-click** sets the goal, **Shift-click** paints a costly "street" (cost 100), **Right-click** toggles a blocked tile.
+- **Perlin view** — animated noise preview (scroll / distort / stretch).
+- **Twin-stick view** — **left-drag** = movement, **right-drag** = aim; shows the side-step indicator.
+- **Left dock** — Evolution & Breeding (morph slider, breed, spawn random) and IK (solver, Z-bend toggles, joint pulls).
+- **Right dock tabs** — Flow (step / play), Palette Swap (recolor region masks live), Perlin (mode/scale/animate), Twin-Stick readout.
+
+The GUI is a thin view over `StudioModel` (`core/critter/studio.py`), which holds all state and produces plain render data — so the engine logic stays testable headlessly (`tests/test_critter_studio.py`).
