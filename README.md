@@ -51,3 +51,8 @@ Layout:
 - **Right dock tabs** — Flow (step / play), Palette Swap (recolor region masks live), Perlin (mode/scale/animate), Twin-Stick readout.
 
 The GUI is a thin view over `StudioModel` (`core/critter/studio.py`), which holds all state and produces plain render data — so the engine logic stays testable headlessly (`tests/test_critter_studio.py`).
+
+## Documentation
+
+Full engine & studio documentation: [`docs/critter-crosser.md`](docs/critter-crosser.md)
+(covers architecture, every subsystem with API examples, GUI usage, CLI and tests).
