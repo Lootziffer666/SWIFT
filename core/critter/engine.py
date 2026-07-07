@@ -22,6 +22,7 @@ class Critter:
 
     name: str
     skeleton: Skeleton
+    id: int = 0
     position: Vec3 = field(default_factory=lambda: Vec3(0.0, 0.0, 0.0))
     evolution: float = 0.0  # 0=larva .. 1=adult
 
