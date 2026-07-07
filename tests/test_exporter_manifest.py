@@ -86,3 +86,21 @@ class TestExportManifest:
         m = SpriteSheetManifest.from_file(out_path)
         assert m.animations["run"].fps == 6
         assert m.animations["run"].loop is False
+
+    def test_manifest_with_depth_image(self, tmp_path):
+        from core.exporter import export_manifest
+        from core.sprite_sheet import SpriteSheetManifest
+
+        frames = _make_frames(tmp_path, 2)
+        depth_img = str(tmp_path / "depth.png")
+        Image.new("L", (64, 40), 128).save(depth_img, "PNG")
+
+        out_path = str(tmp_path / "depth_manifest.json")
+        export_manifest(frames, out_path, anim_name="idle", depth_image="depth.png")
+
+        m = SpriteSheetManifest.from_file(out_path)
+        assert m.depth_image == "depth.png"
+
+        with open(out_path) as f:
+            data = json.load(f)
+            assert data.get("depthImage") == "depth.png"

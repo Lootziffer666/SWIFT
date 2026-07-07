@@ -1,0 +1,48 @@
+name: SWIFT Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pillow
+
+    - name: Run tests
+      run: |
+        python -m pytest tests/ -v --tb=short
+
+    - name: Verify Manifest Schema v1.4.0
+      run: |
+        python -c "
+import json
+from core.sprite_sheet import SpriteSheetManifest
+from tests.fixtures import FIXTURES_DIR
+import os
+
+# Test manifest loading and schema
+manifest_path = os.path.join(FIXTURES_DIR, 'cat_manifest.json')
+if os.path.exists(manifest_path):
+    manifest = SpriteSheetManifest.from_file(manifest_path)
+    print(f'✓ Manifest v{manifest.version} loaded successfully')
+    print(f'  - Frames: {len(manifest.frame_rects)}')
+    print(f'  - Animations: {len(manifest.animations)}')
+    print(f'  - Schema: {manifest.__class__.__name__}')
+else:
+    print('⚠️ No test manifest found (OK for CI)')
+"

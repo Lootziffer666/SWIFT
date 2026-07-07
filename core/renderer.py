@@ -21,6 +21,7 @@ class StyleParams:
     camera_angle: str = "front"
     palette_hint: Optional[str] = None     # e.g. "warm, limited 16 colors"
     exaggeration: float = 1.0              # 1.0 = normal, >1 = more squash/stretch
+    enable_depth: bool = False             # Enable Z-buffer depth pass rendering
 
 
 @dataclass
@@ -57,6 +58,7 @@ class Renderer:
             pixel_size=s.pixel_size or self._config.default_pixel_size,
             camera_angle=s.camera_angle or self._config.default_camera_angle,
             blender_path=self._config.blender_path,
+            enable_depth=s.enable_depth,
         )
         return self._bridge.render(job, progress_cb=progress_cb)
 
@@ -74,13 +76,30 @@ class Renderer:
         if not result.success:
             raise RuntimeError(f"Render failed: {result.error}")
 
-        exporter = Exporter(result.sprite_frames(), fps=style.fps if style else 12)
+        s = style or StyleParams()
+        exporter = Exporter(
+            result.sprite_frames(),
+            fps=s.fps or self._config.default_fps,
+            depth_frame_paths=result.depth_frames() if s.enable_depth else None,
+        )
         out = export_path or os.path.join(result.frames_dir, "output")
 
         if export_format == "sprite_sheet":
             sheet_path = exporter.to_sprite_sheet(out + ".png")
+
+            # Export depth sheet if available
+            depth_sheet_path = None
+            if s.enable_depth and result.depth_frames():
+                depth_sheet_path = exporter.to_depth_sheet(out + "_depth.png")
+
+            # Export manifest with depth metadata
             name = anim_name or os.path.splitext(os.path.basename(anim_fbx or char_fbx))[0]
-            exporter.to_manifest(out + "_manifest.json", animation_name=name)
+            depth_image = os.path.basename(depth_sheet_path) if depth_sheet_path else None
+            exporter.to_manifest(
+                out + "_manifest.json",
+                animation_name=name,
+                depth_image=depth_image,
+            )
             return sheet_path
         elif export_format == "gif":
             return exporter.to_gif(out + ".gif")
