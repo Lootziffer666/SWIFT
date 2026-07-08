@@ -150,6 +150,51 @@ class TestDepthRenderConfiguration:
         assert result.error is not None
 
 
+class TestDepthNodeGraphConstruction:
+    """The compositor node graph must write into the depth subdir (fix for A)."""
+
+    def test_build_depth_sets_base_path_and_filename(self):
+        from scripts.blender_render import build_depth_compositor, make_fake_node_tree
+
+        tree = make_fake_node_tree()
+        out_dir = "/out/depth"
+        build_depth_compositor(tree, out_dir, "frame_####_depth.png")
+
+        file_out = next(n for n in tree.nodes if n.type == "CompositorNodeFile")
+        assert file_out.base_path == out_dir
+        assert file_out.file_slots[0].path == "frame_####_depth.png"
+        assert file_out.format.file_format == "PNG"
+        assert file_out.format.color_mode == "BW"
+        assert file_out.format.color_depth == "8"
+
+    def test_build_depth_links_z_through_maprange_to_fileoutput(self):
+        from scripts.blender_render import build_depth_compositor, make_fake_node_tree
+
+        tree = make_fake_node_tree()
+        build_depth_compositor(tree, "/out/depth")
+        rl = next(n for n in tree.nodes if n.type == "CompositorNodeRLayers")
+        map_range = next(n for n in tree.nodes if n.type == "CompositorNodeMapRange")
+        math_node = next(n for n in tree.nodes if n.type == "CompositorNodeMath")
+        file_out = next(n for n in tree.nodes if n.type == "CompositorNodeFile")
+
+        links = tree.links.links
+        # RLayer.Z -> MapRange.Value
+        assert (rl.outputs["Z"], map_range.inputs["Value"]) in links
+        # MapRange.Result -> Math[0]
+        assert (map_range.outputs["Result"], math_node.inputs[0]) in links
+        # Math -> FileOutput[0]
+        assert (math_node.outputs[0], file_out.inputs[0]) in links
+
+    def test_build_depth_scales_to_255(self):
+        from scripts.blender_render import build_depth_compositor, make_fake_node_tree
+
+        tree = make_fake_node_tree()
+        build_depth_compositor(tree, "/out/depth")
+        math_node = next(n for n in tree.nodes if n.type == "CompositorNodeMath")
+        assert math_node.operation == "MULTIPLY"
+        assert math_node.inputs[1].default_value == 255.0
+
+
 class TestDepthFrameMetadata:
     def test_depth_frames_match_color_frame_count(self):
         """For successful depth renders, frame counts should match."""
