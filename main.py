@@ -128,6 +128,125 @@ def _build_render_summary(args, sheet_path: str) -> dict:
     }
 
 
+# Named palette-swap presets. Each maps the documented base-sheet source colors
+# (the renderer's canonical "team blue" ramp) onto a recolored variant. End users
+# can also define arbitrary swaps at runtime via --variants "name=Src:Dst" (see
+# parse_palette_variant_spec). The real dict is built lazily below.
+PRESET_PALETTE_NAMES = ("red", "green", "purple", "gold")
+
+
+def _load_preset_palettes():
+    """Build the named preset palettes lazily (imports core.procedural)."""
+    from core.procedural.palette_swap import Palette
+    return {
+        'red': Palette.from_hex_map({'#4169E1': '#FF6347', '#6495ED': '#FF4500', '#1E90FF': '#DC143C'}),
+        'green': Palette.from_hex_map({'#4169E1': '#228B22', '#6495ED': '#32CD32', '#1E90FF': '#00AA00'}),
+        'purple': Palette.from_hex_map({'#4169E1': '#9932CC', '#6495ED': '#DA70D6', '#1E90FF': '#8A2BE2'}),
+        'gold': Palette.from_hex_map({'#4169E1': '#FFD700', '#6495ED': '#FFA500', '#1E90FF': '#FF8C00'}),
+    }
+
+
+def parse_palette_variant_spec(spec, presets=None):
+    """Parse one ``--variants`` entry into ``(name, Palette)``.
+
+    Two syntaxes are supported:
+
+    * **Named preset** — ``red`` looks ``name`` up in ``presets``. Raises
+      ``KeyError(name)`` when unknown.
+    * **Custom hex map** — ``team_red=#4169E1:#FF6347`` defines an arbitrary
+      swap (source hex -> target hex). Multiple source->target pairs are joined
+      with ``;``: ``x=#AABBCC:#112233;#DDEEFF:#445566``.
+
+    Parsing is a pure function of its input, so output is fully deterministic.
+    """
+    from core.procedural.palette_swap import Palette
+
+    spec = spec.strip()
+    if "=" in spec:
+        name, hexpart = spec.split("=", 1)
+        name = name.strip()
+        if not name:
+            raise ValueError(f"Empty variant name in {spec!r}")
+        hex_map = {}
+        for pair in hexpart.split(";"):
+            pair = pair.strip()
+            if not pair:
+                continue
+            if ":" not in pair:
+                raise ValueError(
+                    f"Invalid custom variant map {pair!r} in {spec!r} (expected src:dst)"
+                )
+            src, dst = pair.split(":", 1)
+            hex_map[src.strip()] = dst.strip()
+        if not hex_map:
+            raise ValueError(f"No color map found in {spec!r}")
+        return name, Palette.from_hex_map(hex_map)
+
+    name = spec
+    if not name:
+        raise ValueError("Empty variant name")
+    if presets is not None and name not in presets:
+        raise KeyError(name)
+    return name, presets[name]
+
+
+def parse_palette_variants_arg(variants_arg, presets=None):
+    """Parse a full ``--variants`` string into a list of ``(name, Palette)``."""
+    return [
+        parse_palette_variant_spec(item, presets)
+        for item in (variants_arg or "").split(",")
+        if item.strip()
+    ]
+
+
+def apply_palette_variants(base_sheet_path, manifest_path, variant_specs, reporter=None):
+    """Generate runtime palette-variant PNGs from a base sheet.
+
+    For each ``(name, palette)`` in ``variant_specs`` a ``<base>_<name>.png`` is
+    written next to the base sheet, remapped via ``PaletteSwapper`` (a pure
+    pixel LUT pass — no Blender, fully deterministic). When ``manifest_path``
+    exists, its ``variants`` list is updated to ``[{"name", "path"}, ...]``
+    (basename only).
+
+    Returns the list of ``(name, variant_path)`` that were written.
+    """
+    from core.procedural.palette_swap import PaletteSwapper
+    from PIL import Image
+
+    if not os.path.exists(base_sheet_path):
+        if reporter:
+            reporter.say(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
+        return []
+
+    base_dir = os.path.dirname(base_sheet_path) or "."
+    base_name = os.path.splitext(os.path.basename(base_sheet_path))[0]
+    base_sheet = Image.open(base_sheet_path).convert("RGBA")
+
+    results = []
+    for name, palette in variant_specs:
+        swapper = PaletteSwapper(palette)
+        variant_sheet = swapper.remap_frame(base_sheet)
+        variant_path = os.path.join(base_dir, f"{base_name}_{name}.png")
+        # PNG is written without timestamps so repeated runs are byte-identical.
+        variant_sheet.save(variant_path, "PNG", optimize=False)
+        results.append((name, variant_path))
+        if reporter:
+            reporter.say(f"  ✓ {name}: {variant_path}")
+
+    if results and manifest_path and os.path.exists(manifest_path):
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+        manifest["variants"] = [
+            {"name": n, "path": os.path.basename(p)} for n, p in results
+        ]
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+        if reporter:
+            reporter.say(f"  ✓ Manifest updated with {len(results)} variants")
+
+    return results
+
+
 def cmd_render(args, reporter: Reporter):
     from core.renderer import Renderer, RendererConfig, StyleParams
 
@@ -201,50 +320,20 @@ def cmd_render(args, reporter: Reporter):
     # Phase 3: Handle palette variants
     if args.variants:
         reporter.say(f"\nGenerating palette variants: {args.variants}")
-        from core.procedural.palette_swap import Palette, PaletteSwapper
-        from PIL import Image
+        presets = _load_preset_palettes()
+        try:
+            variant_specs = parse_palette_variants_arg(args.variants, presets)
+        except KeyError as exc:
+            reporter.say(f"  ⚠️ Unknown variant: {exc} (skip)")
+            variant_specs = None
+        except ValueError as exc:
+            reporter.say(f"  ⚠️ Invalid variant spec: {exc} (skip)")
+            variant_specs = None
 
-        variants_list = [v.strip() for v in args.variants.split(",")]
-
-        base_sheet_path = out if out.endswith('.png') else out + '.png'
-        if not os.path.exists(base_sheet_path):
-            reporter.say(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
-        else:
-            base_sheet = Image.open(base_sheet_path)
-            variant_data = {}
-
-            PRESET_PALETTES = {
-                'red': Palette.from_hex_map({'#4169E1': '#FF6347', '#6495ED': '#FF4500', '#1E90FF': '#DC143C'}),
-                'green': Palette.from_hex_map({'#4169E1': '#228B22', '#6495ED': '#32CD32', '#1E90FF': '#00AA00'}),
-                'purple': Palette.from_hex_map({'#4169E1': '#9932CC', '#6495ED': '#DA70D6', '#1E90FF': '#8A2BE2'}),
-                'gold': Palette.from_hex_map({'#4169E1': '#FFD700', '#6495ED': '#FFA500', '#1E90FF': '#FF8C00'}),
-            }
-
-            for variant_name in variants_list:
-                if variant_name not in PRESET_PALETTES:
-                    reporter.say(f"  ⚠️ Unknown variant: {variant_name} (skip)")
-                    continue
-
-                palette = PRESET_PALETTES[variant_name]
-                swapper = PaletteSwapper(palette)
-                variant_sheet = swapper.remap_frame(base_sheet)
-
-                variant_path = out.replace('.png', f'_{variant_name}.png')
-                variant_sheet.save(variant_path, 'PNG')
-                variant_data[variant_name] = {
-                    'path': os.path.basename(variant_path),
-                    'palette': variant_name
-                }
-                reporter.say(f"  ✓ {variant_name}: {variant_path}")
-
-            manifest_path = out.replace('.png', '_manifest.json')
-            if os.path.exists(manifest_path) and variant_data:
-                with open(manifest_path, 'r') as f:
-                    manifest = json.load(f)
-                manifest['variants'] = [{'name': k, 'path': v['path']} for k, v in variant_data.items()]
-                with open(manifest_path, 'w') as f:
-                    json.dump(manifest, f, indent=2)
-                reporter.say(f"  ✓ Manifest updated with {len(variant_data)} variants")
+        if variant_specs is not None:
+            base_sheet_path = out if out.endswith('.png') else out + '.png'
+            manifest_path = out.replace('.png', '_manifest.json') if out.endswith('.png') else out + '_manifest.json'
+            apply_palette_variants(base_sheet_path, manifest_path, variant_specs, reporter=reporter)
 
     # SHADED world-state hooks: generate REAL per-state actor variants
     if args.world_states:

@@ -105,6 +105,7 @@ class SpriteSheetManifest:
         self.emissive_source_w: int = 0            # emissive map source width
         self.emissive_source_h: int = 0            # emissive map source height
         self.world_states: Dict[str, WorldStateRef] = {}   # world-state name → descriptor
+        self.variants: list = []                     # palette variants: [{name, path}]
 
     @classmethod
     def from_file(cls, path: str) -> "SpriteSheetManifest":
@@ -186,6 +187,11 @@ class SpriteSheetManifest:
                 r = emissive_rects.get(fid)
                 if r:
                     m.emissive_frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
+
+        # Parse palette variants (optional; runtime color variants)
+        variants = data.get("variants")
+        if variants:
+            m.variants = list(variants)
 
         # Parse animations
         for anim_name, anim_data in data.get("animations", {}).items():

@@ -196,7 +196,7 @@ class RenderTab(_CommandTab):
         self.world_states = QLineEdit()
         self.world_states.setPlaceholderText("e.g. dust,aging=0.7")
         self.variants = QLineEdit()
-        self.variants.setPlaceholderText("e.g. red,green,gold")
+        self.variants.setPlaceholderText("e.g. red,green")
 
         # Layout
         basic = QGroupBox("Render")
@@ -227,7 +227,7 @@ class RenderTab(_CommandTab):
         ws = QGroupBox("SHADED world states & variants")
         wform = QFormLayout(ws)
         wform.addRow("World states", self.world_states)
-        wform.addRow("Variants", self.variants)
+        wform.addRow("Palette variants", self.variants)
         self._layout.addWidget(ws)
 
     def _on_run(self):

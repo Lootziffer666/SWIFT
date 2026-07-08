@@ -36,6 +36,11 @@ def test_render_tab_exposes_world_states(qapp):
     rt.world_states.set_text("dust,aging=0.7")
     assert rt.world_states.text() == "dust,aging=0.7"
 
+    # Palette-variants control must be present and editable (runtime color swaps)
+    assert isinstance(rt.variants, QLineEdit)
+    rt.variants.set_text("red,green")
+    assert rt.variants.text() == "red,green"
+
 
 def test_all_command_tabs_present(qapp):
     window = MainWindow()
