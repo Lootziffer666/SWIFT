@@ -42,6 +42,8 @@ class SkeletonGenerator:
                 - 'params': SkeletonParams used
                 - 'fbx_path': path if exported, None otherwise
                 - 'metadata': dict with generation metadata
+                - 'ik_chains': list of IK chain dicts (only if with_ik)
+                - 'mesh_bodies': list of capsule mesh specs (only if with_mesh_bodies)
         """
         # Scale template skeleton
         scaled_skeleton = scale_skeleton(self.template, params.height_cm, params.weight_kg)
@@ -57,32 +59,115 @@ class SkeletonGenerator:
             "root_joint": scaled_skeleton.root_joint,
         }
 
-        result = {
+        result: Dict = {
             "skeleton": scaled_skeleton,
             "params": params,
             "fbx_path": None,
             "metadata": metadata,
+            "ik_chains": [],
+            "mesh_bodies": [],
         }
+
+        # Build 2-bone IK chains for limbs when requested.
+        if params.with_ik:
+            result["ik_chains"] = self._compute_ik_chains(scaled_skeleton)
+
+        # Build capsule mesh body specs for each bone when requested.
+        if params.with_mesh_bodies:
+            result["mesh_bodies"] = self._compute_mesh_bodies(scaled_skeleton, params)
 
         # Export to FBX if path provided
         if export_fbx:
-            fbx_path = self._export_fbx_blender(scaled_skeleton, export_fbx, params)
+            fbx_path = self._export_fbx_blender(
+                scaled_skeleton, export_fbx, params,
+                ik_chains=result["ik_chains"],
+                mesh_bodies=result["mesh_bodies"],
+            )
             result["fbx_path"] = fbx_path
 
         return result
 
-    def _export_fbx_blender(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams) -> str:
+    @staticmethod
+    def _compute_ik_chains(skeleton: SkeletonDef) -> List[Dict]:
+        """
+        Compute 2-bone IK chains for the limbs of the given skeleton.
+
+        Uses the canonical humanoid IK rig definitions. Pure (no Blender),
+        so it is fully verifiable in unit tests.
+        """
+        from core.procedural.ik_rig import IKRigger
+
+        rigger = IKRigger(skeleton)
+        valid, msg = rigger.validate_chains()
+        if not valid:
+            raise ValueError(f"IK chain validation failed: {msg}")
+
+        chains = []
+        for chain in rigger.chains:
+            if not chain.enabled:
+                continue
+            bones = rigger.get_chain_bones(chain)
+            chains.append({
+                "name": chain.name,
+                "end_effector": chain.end_effector,
+                "chain_length": chain.chain_length,
+                "pole_angle": chain.pole_angle,
+                "bones": bones,
+            })
+        return chains
+
+    @staticmethod
+    def _compute_mesh_bodies(skeleton: SkeletonDef, params: SkeletonParams) -> List[Dict]:
+        """
+        Compute capsule mesh body specs for every bone in the skeleton.
+
+        Radius scales with the cube-root of the weight ratio (volume scaling),
+        and length tracks the scaled bone length. Pure (no Blender), so it is
+        fully verifiable in unit tests.
+        """
+        weight_ratio = params.weight_kg / 70.0  # Reference: 70kg
+        thickness_scale = weight_ratio ** (1.0 / 3.0)
+
+        bodies = []
+        for name, joint in skeleton.joints.items():
+            if joint.bone_length <= 0:
+                continue
+            radius = max(joint.bone_length * 0.08, 0.02) * thickness_scale
+            # Cylindrical part length (caps add 2*radius). Clamp to keep valid.
+            length = max(joint.bone_length - 2.0 * radius, 0.01)
+            midpoint = (
+                joint.offset[0],
+                joint.offset[1] + joint.bone_length / 2.0,
+                joint.offset[2],
+            )
+            bodies.append({
+                "bone": name,
+                "radius": radius,
+                "length": length,
+                "midpoint": list(midpoint),
+            })
+        return bodies
+
+    def _export_fbx_blender(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams,
+                             ik_chains: Optional[List[Dict]] = None,
+                             mesh_bodies: Optional[List[Dict]] = None) -> str:
         """
         Export skeleton as FBX via Blender (requires bpy).
         Falls back to mock export if Blender unavailable.
         """
         try:
             import bpy
-            return self._build_blender_armature(skeleton, out_path, params)
+            return self._build_blender_armature(
+                skeleton, out_path, params,
+                ik_chains=ik_chains or [],
+                mesh_bodies=mesh_bodies or [],
+            )
         except ImportError:
             # Blender not available; create placeholder FBX marker file for testing
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
-            # Write skeleton metadata as JSON alongside as reference
+            # Write skeleton metadata as JSON alongside as reference. This records
+            # the IK chains and mesh bodies so the generated rig is verifiable
+            # without Blender.
             meta_path = out_path.replace(".fbx", "_skeleton.json")
             with open(meta_path, "w") as f:
                 json.dump(
@@ -104,6 +189,8 @@ class SkeletonGenerator:
                             "with_ik": params.with_ik,
                             "with_mesh_bodies": params.with_mesh_bodies,
                         },
+                        "ik_chains": ik_chains or [],
+                        "mesh_bodies": mesh_bodies or [],
                     },
                     f,
                     indent=2,
@@ -113,7 +200,9 @@ class SkeletonGenerator:
                 f.write(b"FBX placeholder - replace with real Blender export\n")
             return out_path
 
-    def _build_blender_armature(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams) -> str:
+    def _build_blender_armature(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams,
+                                 ik_chains: Optional[List[Dict]] = None,
+                                 mesh_bodies: Optional[List[Dict]] = None) -> str:
         """
         Build Blender armature from SkeletonDef hierarchy.
         Creates bones via bpy.ops, optionally adds IK chains and mesh bodies.
@@ -163,11 +252,11 @@ class SkeletonGenerator:
 
         # Apply optional IK chains (if with_ik=True)
         if params.with_ik:
-            self._apply_ik_chains(armature_obj, skeleton)
+            self._apply_ik_chains(armature_obj, skeleton, ik_chains or [])
 
         # Generate optional mesh bodies (if with_mesh_bodies=True)
         if params.with_mesh_bodies:
-            self._generate_mesh_bodies(armature_obj, skeleton, params)
+            self._generate_mesh_bodies(armature_obj, skeleton, params, mesh_bodies or [])
 
         # Export to FBX
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -181,23 +270,22 @@ class SkeletonGenerator:
 
         return out_path
 
-    def _apply_ik_chains(self, armature_obj, skeleton: SkeletonDef):
-        """Apply 2-bone IK chains to legs and arms."""
+    def _apply_ik_chains(self, armature_obj, skeleton: SkeletonDef, ik_chains: List[Dict]):
+        """
+        Apply 2-bone IK chains to legs and arms in the Blender armature.
+
+        Uses the IKRigger to apply constraints so the rig applied here matches
+        exactly the chains reported in `generate()`'s result.
+        """
         import bpy
+        from core.procedural.ik_rig import IKRigger
 
         bpy.context.view_layer.objects.active = armature_obj
         bpy.ops.object.mode_set(mode="POSE")
         pose_bones = armature_obj.pose.bones
 
-        # Define IK chains: list of (end_effector, chain_length) tuples
-        ik_chains = [
-            ("Hand.L", 2),  # Forearm.L -> Arm.L
-            ("Hand.R", 2),  # Forearm.R -> Arm.R
-            ("Foot.L", 2),  # Shin.L -> Leg.L
-            ("Foot.R", 2),  # Shin.R -> Leg.R
-        ]
-
-        for end_effector_name, chain_len in ik_chains:
+        for chain in ik_chains:
+            end_effector_name = chain["end_effector"]
             if end_effector_name not in pose_bones:
                 continue
 
@@ -205,49 +293,67 @@ class SkeletonGenerator:
 
             # Add IK constraint
             ik = end_effector.constraints.new(type="IK")
-            ik.chain_count = chain_len
-            ik.pole_angle = 0
+            ik.chain_count = chain["chain_length"]
+            ik.pole_angle = chain.get("pole_angle", 0.0)
 
             # Store IK metadata in custom property (for external IK solvers)
-            armature_obj[f"ik_{end_effector_name}"] = {
-                "chain_length": chain_len,
+            armature_obj[f"ik_{chain['name']}"] = {
+                "chain_length": chain["chain_length"],
+                "end_effector": end_effector_name,
                 "enabled": True,
             }
 
         bpy.ops.object.mode_set(mode="OBJECT")
 
-    def _generate_mesh_bodies(self, armature_obj, skeleton: SkeletonDef, params: SkeletonParams):
-        """Generate simplified capsule mesh bodies for each bone."""
+    def _generate_mesh_bodies(self, armature_obj, skeleton: SkeletonDef, params: SkeletonParams,
+                              mesh_bodies: List[Dict]):
+        """
+        Generate capsule mesh bodies for each bone in the Blender armature.
+
+        Capsules are positioned at each bone's midpoint and oriented along the
+        bone's local axis (head -> tail). Falls back to a UV sphere if the
+        capsule primitive is unavailable in the running Blender version.
+        """
         import bpy
-        from mathutils import Vector, Matrix
+        from mathutils import Vector, Quaternion
 
-        # Simplified: create UV-sphere mesh per major joint
-        # (Torso, Arm.L/R, Leg.L/R, Head if present)
-        major_joints = {"Chest", "Arm.L", "Arm.R", "Leg.L", "Leg.R"}
+        # Bones are built along local +Y (tail = head + (0, bone_length, 0)).
+        bone_dir = Vector((0.0, 1.0, 0.0))
+        # Quaternion that rotates the capsule's default +Z axis onto bone_dir.
+        z_axis = Vector((0.0, 0.0, 1.0))
+        quat = z_axis.rotation_difference(bone_dir)
 
-        for joint_name in major_joints:
-            if joint_name not in skeleton.joints:
-                continue
+        for spec in mesh_bodies:
+            name = spec["bone"]
+            radius = spec["radius"]
+            length = spec["length"]
+            midpoint = Vector(spec["midpoint"])
 
-            joint = skeleton.joints[joint_name]
-            bone_length = joint.bone_length
+            mesh_obj = None
+            # Try the capsule primitive; the parameter name differs across
+            # Blender versions (height vs depth), so probe defensively.
+            for length_kw in ("height", "depth"):
+                try:
+                    bpy.ops.mesh.primitive_capsule_add(
+                        radius=radius, **{length_kw: length}
+                    )
+                    mesh_obj = bpy.context.active_object
+                    break
+                except (TypeError, RuntimeError):
+                    continue
 
-            # Estimate radius from bone length and weight ratio
-            weight_ratio = params.weight_kg / 70.0  # Reference 70kg
-            radius = bone_length * 0.1 * (weight_ratio ** (1 / 3))  # Cube-root scaling
+            # Fallback: approximate with a UV sphere if capsule is unavailable.
+            if mesh_obj is None:
+                bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=midpoint)
+                mesh_obj = bpy.context.active_object
 
-            # Create UV sphere
-            bpy.ops.mesh.primitive_uv_sphere_add(
-                radius=radius,
-                location=joint.offset,
-            )
-            mesh_obj = bpy.context.active_object
-            mesh_obj.name = f"{joint_name}_Mesh"
+            mesh_obj.name = f"{name}_Mesh"
+            mesh_obj.location = midpoint
+            mesh_obj.rotation_mode = "QUATERNION"
+            mesh_obj.rotation_quaternion = quat
 
-            # Parent mesh to armature bone
+            # Parent mesh to the armature object so it stays with the rig.
             mesh_obj.parent = armature_obj
-            mesh_obj.parent_type = "BONE"
-            mesh_obj.parent_bone = joint_name
 
     def generate_from_json(self, json_path: str, export_fbx: Optional[str] = None) -> Dict:
         """Generate skeleton from JSON params file."""

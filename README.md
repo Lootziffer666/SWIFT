@@ -100,7 +100,7 @@ addActor-Kompatibilität + Manifest-Round-Trip. Details in `docs/ECOSYSTEM.md`.
 
 | Subcommand | Zweck | Wichtigste Flags |
 |------------|-------|------------------|
-| `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator` |
+| `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator`, `--height-cm`, `--weight-kg`, `--with-ik`, `--mesh-bodies`, `--skeleton-output` |
 | `analyze` | Referenz-Sheet → StyleParams (Claude Vision) | `sheet` (pos), `--api-key` |
 | `mocap` | Video → BVH | `video` (pos), `--output` |
 | `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes` |
@@ -247,6 +247,44 @@ pytest tests/test_exporter_manifest.py -v
 # Lädt erzeugtes Manifest, validiert Struktur, parst zurück zu Python-Objekten
 ```
 
+## Phase 2+ Features (implementiert)
+
+### Procedurale Skelette (Parametrische Charakter-Generierung)
+
+Über `--skeleton-generator` wird kein FBX geladen, sondern ein parametrisches
+Humanoid-Skelett (Armature + Knochen) erzeugt und **dieses generierte Rig**
+gerendert. Das ursprüngliche Eingabe-Modell (`--model`) wird **nie
+überschrieben**.
+
+- Ohne `--skeleton-output` wird das Rig neben dem Eingabemodell abgelegt:
+  `<model>_procedural.fbx`.
+- Mit `--skeleton-output <pfad>` wird ein beliebiger Zielpfad erzwungen.
+
+Parameter steuern Proportionen und Ausstattung:
+
+| Flag | Bedeutung | Default |
+|------|-----------|---------|
+| `--height-cm` | Körpergröße in cm (skaliert alle Knochenlängen linear) | `170.0` |
+| `--weight-kg` | Gewicht in kg (skaliert Knochen-Dicke der Mesh-Bodies ∝ ³√Gewicht) | `70.0` |
+| `--with-ik` | 2-Knochen-IK-Ketten an Armen/Beinen (Hand.L/R, Foot.L/R) | aus |
+| `--mesh-bodies` | Kapsel-Mesh-Körper pro Knochen (Radius ∝ Gewicht, Länge ∝ Knochen) | aus |
+| `--skeleton-output` | Ziel-FBX für das generierte Rig (Original bleibt erhalten) | `<model>_procedural.fbx` |
+
+Beispiel:
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --skeleton-generator \
+  --height-cm 185 --weight-kg 90 \
+  --with-ik --mesh-bodies \
+  --output out/hero
+# Erzeugt + rendert: character_procedural.fbx (Original character.fbx unverändert)
+```
+
+Die IK-Ketten- und Mesh-Body-Geometrie werden rein (ohne Blender) berechnet und
+sind per Unit-Test verifizierbar (`tests/test_skeleton_procedural_math.py`).
+
 ## Abhängigkeiten
 
 | Paket | Zweck |
@@ -259,10 +297,10 @@ Blender wird NICHT als Python-Modul importiert, sondern via Subprocess aufgerufe
 
 ## Zukunfts-Erweiterungen (Phase 2+)
 
-- **Depth-Rendering:** Blender Z-Buffer-Pass zu 8-bit Grayscale PNG (Phase B2)
-- **Procedurale Skelette:** Parametrische Charakter-Generierung (IK, Proportionen)
-- **Palette-Swapping:** Runtime-Farbvarianten ohne Neubau (schnelle Personalisierung)
-- **Multi-Pass Rendering:** Separate Passes für Normal-Maps, Emissive (für erweiterte Visuals)
+- **Depth-Rendering:** Blender Z-Buffer-Pass zu 8-bit Grayscale PNG (Phase B2) — *siehe `docs/ORCHESTRATION.md` (implementiert)*
+- **Procedurale Skelette:** Parametrische Charakter-Generierung (IK, Proportionen) — *implementiert, siehe Abschnitt oben*
+- **Palette-Swapping:** Runtime-Farbvarianten ohne Neubau (schnelle Personalisierung) — *implementiert (siehe `docs/ORCHESTRATION.md`)*
+- **Multi-Pass Rendering:** Separate Passes für Normal-Maps, Emissive (für erweiterte Visuals) — *implementiert (`--normal-pass`/`--emissive-pass`)*
 
 ## Git & Branches
 
