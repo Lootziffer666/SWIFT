@@ -4,9 +4,11 @@ Export rendered frames to sprite sheet PNG, animated GIF, or frames + JSON metad
 import os
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from PIL import Image
+
+from core.sprite_sheet import WorldStateRef
 
 
 def _load_frames(frame_paths: list[str]) -> list[Image.Image]:
@@ -100,6 +102,7 @@ def export_manifest(
     padding: int = 0,
     depth_image: Optional[str] = None,
     depth_frame_paths: Optional[list[str]] = None,
+    world_states: Optional[Dict[str, WorldStateRef]] = None,
 ) -> str:
     """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema v1.4.0+)
     describing the layout export_sprite_sheet() packs these same frames into.
@@ -150,6 +153,12 @@ def export_manifest(
             for fid, (x, y, w, h) in zip(frame_ids, depth_rects)
         }
         manifest["depthSourceImage"] = {"w": depth_w, "h": depth_h}
+
+    # Add SHADED world-state hooks (optional; additive field)
+    if world_states:
+        manifest["worldStates"] = {
+            ws_name: ws_ref.to_dict() for ws_name, ws_ref in world_states.items()
+        }
 
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w") as f:
@@ -301,8 +310,9 @@ class Exporter:
         animation_name: str = "animation",
         loop: bool = True,
         depth_image: Optional[str] = None,
+        world_states: Optional[Dict[str, WorldStateRef]] = None,
     ) -> str:
-        """Export manifest with optional depth frame metadata."""
+        """Export manifest with optional depth frame and world-state metadata."""
         return export_manifest(
             self.frame_paths,
             out_path,
@@ -311,4 +321,5 @@ class Exporter:
             loop,
             depth_image=depth_image,
             depth_frame_paths=self.depth_frame_paths if self.depth_frame_paths else None,
+            world_states=world_states,
         )
