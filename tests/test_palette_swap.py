@@ -5,7 +5,15 @@ import pytest
 from PIL import Image
 import tempfile
 import os
-from core.procedural.palette_swap import Palette, PaletteSwapper, _hex_to_rgb, _rgb_to_hex
+from core.procedural.palette_swap import (
+    Palette,
+    PaletteSwapper,
+    _hex_to_rgb,
+    _rgb_to_hex,
+    WORLD_STATE_REGISTRY,
+    get_world_state_palette,
+    remap_world_state,
+)
 
 
 class TestPaletteUtils:
@@ -122,3 +130,64 @@ class TestPaletteSwapper:
         pixel = remapped.getpixel((32, 32))
         # Gray should remain gray
         assert pixel[:3] == (128, 128, 128)
+
+
+class TestWorldStatePalettes:
+    def _create_test_image(self, width=64, height=64, color=(200, 50, 50)):
+        """Create a simple saturated test image."""
+        return Image.new("RGBA", (width, height), color + (255,))
+
+    def test_registry_has_core_states(self):
+        for state in ("dust", "heat", "soot", "aging", "sunbleach", "humidity"):
+            assert state in WORLD_STATE_REGISTRY
+            assert get_world_state_palette(state).name == state
+
+    def test_unknown_state_raises(self):
+        import pytest
+        with pytest.raises(KeyError):
+            get_world_state_palette("not-a-state")
+
+    def _saturation(self, rgb):
+        r, g, b = rgb
+        mx, mn = max(r, g, b), min(r, g, b)
+        if mx == 0:
+            return 0.0
+        return (mx - mn) / mx
+
+    def test_dust_desaturates_and_warms(self):
+        """Dust should reduce saturation vs. the original."""
+        img = self._create_test_image(64, 64, (200, 60, 60))
+        palette = get_world_state_palette("dust")
+        remapped = remap_world_state(img, palette, intensity=1.0)
+
+        orig_sat = self._saturation(img.getpixel((32, 32))[:3])
+        new_sat = self._saturation(remapped.getpixel((32, 32))[:3])
+        assert new_sat < orig_sat
+
+    def test_soot_darkens(self):
+        """Soot should reduce brightness."""
+        img = self._create_test_image(64, 64, (180, 180, 180))
+        palette = get_world_state_palette("soot")
+        remapped = remap_world_state(img, palette, intensity=1.0)
+
+        orig = sum(img.getpixel((32, 32))[:3])
+        new = sum(remapped.getpixel((32, 32))[:3])
+        assert new < orig
+
+    def test_zero_intensity_is_identity(self):
+        img = self._create_test_image(32, 32, (100, 150, 200))
+        palette = get_world_state_palette("heat")
+        remapped = remap_world_state(img, palette, intensity=0.0)
+        assert remapped.getpixel((16, 16))[:3] == (100, 150, 200)
+
+    def test_world_state_preserves_alpha(self):
+        img = Image.new("RGBA", (64, 64), (200, 50, 50, 128))
+        palette = get_world_state_palette("aging")
+        remapped = remap_world_state(img, palette, intensity=1.0)
+        assert remapped.getpixel((32, 32))[3] == 128
+
+    def test_world_state_variant_is_png_size(self):
+        from core.procedural.palette_swap import remap_world_state
+        base = self._create_test_image(128, 64, (200, 80, 80))
+        remapped = remap_world_state(base, get_world_state_palette("humidity"), 1.0)
+        assert remapped.size == (128, 64)

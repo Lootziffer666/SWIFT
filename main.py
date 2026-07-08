@@ -115,6 +115,53 @@ def cmd_render(args):
                     json.dump(manifest, f, indent=2)
                 print(f"  ✓ Manifest updated with {len(variant_data)} variants")
 
+    # SHADED world-state hooks: generate world-state palette variants
+    if args.world_states:
+        print(f"\nGenerating SHADED world-state variants: {args.world_states}")
+        from core.procedural.palette_swap import (
+            get_world_state_palette,
+            remap_world_state,
+        )
+        from core.sprite_sheet import WorldStateRef
+
+        world_states_list = [v.strip() for v in args.world_states.split(",") if v.strip()]
+
+        base_sheet_path = out if out.endswith('.png') else out + '.png'
+        if not os.path.exists(base_sheet_path):
+            print(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
+        else:
+            base_sheet = Image.open(base_sheet_path)
+            ws_manifest = {}
+
+            for state_name in world_states_list:
+                try:
+                    palette = get_world_state_palette(state_name)
+                except KeyError:
+                    print(f"  ⚠️ Unknown world state: {state_name} (skip)")
+                    continue
+
+                variant_sheet = remap_world_state(base_sheet, palette, intensity=1.0)
+                variant_path = out.replace('.png', f'_{state_name}.png')
+                variant_sheet.save(variant_path, 'PNG')
+                ws_manifest[state_name] = WorldStateRef(
+                    name=state_name,
+                    palette=state_name,
+                    intensity=(0.0, 1.0),
+                )
+                print(f"  ✓ {state_name}: {variant_path}")
+
+            manifest_path = out.replace('.png', '_manifest.json')
+            if os.path.exists(manifest_path) and ws_manifest:
+                import json as _json
+                with open(manifest_path, 'r') as f:
+                    manifest = _json.load(f)
+                manifest['worldStates'] = {
+                    name: ref.to_dict() for name, ref in ws_manifest.items()
+                }
+                with open(manifest_path, 'w') as f:
+                    _json.dump(manifest, f, indent=2)
+                print(f"  ✓ Manifest updated with {len(ws_manifest)} world states")
+
 
 def cmd_analyze(args):
     from ai.style_analyzer import StyleAnalyzer
@@ -258,6 +305,8 @@ def build_parser():
     p_render.add_argument("--depth-pass", action="store_true", help="Enable Z-buffer depth pass (8-bit grayscale)")
     # Phase 3: Palette variants
     p_render.add_argument("--variants", help="Comma-separated palette variant names (e.g. 'red,blue,green')")
+    # SHADED world-state hooks
+    p_render.add_argument("--world-states", help="Comma-separated SHADED world states (e.g. 'dust,aging,heat')")
 
     # analyze
     p_analyze = sub.add_parser("analyze", help="Extract style params from a reference sheet")
