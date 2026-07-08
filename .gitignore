@@ -9,3 +9,4 @@ build/
 *.bvh.tmp
 /output/
 /tmp_renders/
+artifacts/
