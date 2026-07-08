@@ -1,7 +1,7 @@
 """
 SWIFT – Sprite Animation AI Workflow
 CLI entry point for Phase 1 (headless render).
-GUI will be added in Phase 3.
+The PySide6 GUI lives in gui/app.py and is launched via `swift gui`.
 """
 import argparse
 import os
@@ -288,9 +288,21 @@ def cmd_spritesheet(args):
         print(f"Done: {out} ({img.size[0]}×{img.size[1]})")
 
 
+def cmd_gui(args):
+    try:
+        from gui.app import main as gui_main
+    except ImportError as exc:
+        print(f"ERROR: GUI requires PySide6 ({exc})")
+        sys.exit(1)
+    gui_main()
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="swift", description="SWIFT Sprite Animation AI Workflow")
     sub = parser.add_subparsers(dest="command")
+
+    # gui
+    sub.add_parser("gui", help="Launch the PySide6 GUI")
 
     # render
     p_render = sub.add_parser("render", help="Render FBX character + animation to sprite sheet")
@@ -365,6 +377,7 @@ def main():
         "mocap": cmd_mocap,
         "video2sprite": cmd_video2sprite,
         "spritesheet": cmd_spritesheet,
+        "gui": cmd_gui,
     }
     dispatch[args.command](args)
 
