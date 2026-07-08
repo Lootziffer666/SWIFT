@@ -57,7 +57,9 @@ Die GUI (`gui/app.py`) kapselt die CLI-Unterbefehle in Tabs: **Render**, **Analy
 **Mocap**, **Video2Sprite**, **SpriteSheet**. Der Render-Tab stellt u. a. ein
 **World-states**-Textfeld bereit (Platzhalter `dust,aging=0.7`), über das die
 SHADED-Weltzustands-Varianten direkt konfiguriert werden – die Varianten entstehen als
-deterministische Pillow/NumPy-Transformationen, also ohne Blender-Laufzeit.
+deterministische Pillow/NumPy-Transformationen, also ohne Blender-Laufzeit. Ebenso gibt
+es das Textfeld **Palette variants** (Platzhalter `red,green`) für Runtime-Farbvarianten
+(via `--variants`, siehe Abschnitt *Palette-Swapping*).
 
 ### Maschinenlesbares CLI (`--json-summary`)
 
@@ -100,7 +102,7 @@ addActor-Kompatibilität + Manifest-Round-Trip. Details in `docs/ECOSYSTEM.md`.
 
 | Subcommand | Zweck | Wichtigste Flags |
 |------------|-------|------------------|
-| `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator` |
+| `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator`, `--height-cm`, `--weight-kg`, `--with-ik`, `--mesh-bodies`, `--skeleton-output` |
 | `analyze` | Referenz-Sheet → StyleParams (Claude Vision) | `sheet` (pos), `--api-key` |
 | `mocap` | Video → BVH | `video` (pos), `--output` |
 | `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes` |
@@ -247,6 +249,112 @@ pytest tests/test_exporter_manifest.py -v
 # Lädt erzeugtes Manifest, validiert Struktur, parst zurück zu Python-Objekten
 ```
 
+## Phase 2+ Features (implementiert)
+
+### Depth-Rendering (Tiefen-Pass)
+
+Über `--depth-pass` wird zusätzlich zum Farb-Sheet ein Z-Buffer-Pass als
+8-bit-Grayscale-PNG gerendert. Das Manifest erhält dann `depthImage`
+(Basename des Depth-Sheets), `depthSourceImage` (Dimensionen) und
+`depthFrameRects` (Frame-Layout, identisch zum Farb-Sheet) — SHADED nutzt diese
+für räumliches Layering (`depthLayer` in `addActor`).
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --anim walk \
+  --depth-pass \
+  --output out/hero
+# Erzeugt: out/hero.png, out/hero_manifest.json, out/hero_depth.png
+# Manifest: "depthImage": "hero_depth.png", "depthFrameRects": {...}
+```
+
+### Multi-Pass Rendering (Normal- & Emissive-Pass)
+
+Mit `--normal-pass` bzw. `--emissive-pass` werden zusätzliche Render-Passes
+erzeugt — eine Normale-Map (RGB-PNG) und ein reines Emissions-Pass
+(Emissions-only RGB-PNG). Das Manifest ergänzt pro Pass
+`normalImage`/`normalSourceImage`/`normalFrameRects` bzw.
+`emissiveImage`/`emissiveSourceImage`/`emissiveFrameRects` (alle optional, nur
+bei aktiviertem Pass vorhanden):
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --anim walk \
+  --normal-pass --emissive-pass \
+  --output out/hero
+# Erzeugt: out/hero_normal.png, out/hero_emissive.png
+# Manifest: "normalImage": "hero_normal.png", "emissiveImage": "hero_emissive.png", ...
+```
+
+### Procedurale Skelette (Parametrische Charakter-Generierung)
+
+Über `--skeleton-generator` wird kein FBX geladen, sondern ein parametrisches
+Humanoid-Skelett (Armature + Knochen) erzeugt und **dieses generierte Rig**
+gerendert. Das ursprüngliche Eingabe-Modell (`--model`) wird **nie
+überschrieben**.
+
+- Ohne `--skeleton-output` wird das Rig neben dem Eingabemodell abgelegt:
+  `<model>_procedural.fbx`.
+- Mit `--skeleton-output <pfad>` wird ein beliebiger Zielpfad erzwungen.
+
+Parameter steuern Proportionen und Ausstattung:
+
+| Flag | Bedeutung | Default |
+|------|-----------|---------|
+| `--height-cm` | Körpergröße in cm (skaliert alle Knochenlängen linear) | `170.0` |
+| `--weight-kg` | Gewicht in kg (skaliert Knochen-Dicke der Mesh-Bodies ∝ ³√Gewicht) | `70.0` |
+| `--with-ik` | 2-Knochen-IK-Ketten an Armen/Beinen (Hand.L/R, Foot.L/R) | aus |
+| `--mesh-bodies` | Kapsel-Mesh-Körper pro Knochen (Radius ∝ Gewicht, Länge ∝ Knochen) | aus |
+| `--skeleton-output` | Ziel-FBX für das generierte Rig (Original bleibt erhalten) | `<model>_procedural.fbx` |
+
+Beispiel:
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --skeleton-generator \
+  --height-cm 185 --weight-kg 90 \
+  --with-ik --mesh-bodies \
+  --output out/hero
+# Erzeugt + rendert: character_procedural.fbx (Original character.fbx unverändert)
+```
+
+Die IK-Ketten- und Mesh-Body-Geometrie werden rein (ohne Blender) berechnet und
+sind per Unit-Test verifizierbar (`tests/test_skeleton_procedural_math.py`).
+
+### Palette-Swapping (Runtime-Farbvarianten)
+
+Farbsvarianten eines bereits gerenderten Sheets entstehen **rein zur Laufzeit**
+(Pillow-LUT-Pass), also **ohne Blender und ohne Neurender**. Das ist ideal für
+schnelle Personalisierung (z. B. Team-Farben, Skins).
+
+Zwei Syntaxen für `--variants` (Komma-getrennt):
+
+- **Benannte Presets** — `red,green,purple,gold` (vordefinierte Rampe auf das
+  kanonische „Team-Blau" des Renderers):
+  ```bash
+  python main.py render --model hero.fbx --output out/hero --variants "red,green"
+  # Erzeugt: out/hero_red.png, out/hero_green.png  +  manifest['variants']
+  ```
+- **Eigene Hex-Maps** — `name=#Src:Dst` definiert beliebige Quell→Ziel-Tausche
+  zur Laufzeit (kein Re-Render nötig). Mehrere Paare mit `;` trennen:
+  ```bash
+  python main.py render --model hero.fbx --output out/hero \
+    --variants "team_red=#4169E1:#FF6347"
+  # Erzeugt: out/hero_team_red.png  (Quell-Farbe #4169E1 -> #FF6347)
+  python main.py render --model hero.fbx --output out/hero \
+    --variants "x=#AABBCC:#112233;#DDEEFF:#445566"
+  ```
+
+Pro Variante wird `<base>_<name>.png` geschrieben und das Manifest um
+`"variants": [{"name": ..., "path": ...}, ...]` ergänzt. Die PNGs sind
+deterministisch (timestamp-frei), und die `variants`-Liste round-trip-t über
+`SpriteSheetManifest`. Der GUI-Render-Tab stellt dafür das Textfeld
+**Palette variants** (Platzhalter `red,green`) bereit.
+
+
 ## Abhängigkeiten
 
 | Paket | Zweck |
@@ -257,12 +365,16 @@ pytest tests/test_exporter_manifest.py -v
 
 Blender wird NICHT als Python-Modul importiert, sondern via Subprocess aufgerufen (`blender --background --python ...`). Das erlaubt flexible Blender-Versionen und sichere Parallelisierung.
 
-## Zukunfts-Erweiterungen (Phase 2+)
+## Zukunfts-Erweiterungen
 
-- **Depth-Rendering:** Blender Z-Buffer-Pass zu 8-bit Grayscale PNG (Phase B2)
-- **Procedurale Skelette:** Parametrische Charakter-Generierung (IK, Proportionen)
-- **Palette-Swapping:** Runtime-Farbvarianten ohne Neubau (schnelle Personalisierung)
-- **Multi-Pass Rendering:** Separate Passes für Normal-Maps, Emissive (für erweiterte Visuals)
+Die ursprünglich hier gelisteten Phase-2+-Features — Depth-Rendering,
+Procedurale Skelette, Palette-Swapping und Multi-Pass Rendering
+(Normal/Emissive) — sind **bereits implementiert** und unter
+[*Phase 2+ Features (implementiert)*](#phase-2-features-implementiert)
+dokumentiert. Hier folgen nur noch offene, nicht umgesetzte Ideen:
+
+- *Platzhalter für künftige Erweiterungen (z. B. weiteres Multi-Channel-Rendering,
+  komplexere IK-Topologien).*
 
 ## Git & Branches
 

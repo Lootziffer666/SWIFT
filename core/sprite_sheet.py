@@ -96,7 +96,16 @@ class SpriteSheetManifest:
         self.depth_frame_rects: dict[str, tuple] = {}  # id → (x, y, w, h) for depth frames
         self.depth_source_w: int = 0               # depth map source width
         self.depth_source_h: int = 0               # depth map source height
+        self.normal_image: Optional[str] = None    # optional path to normal-map PNG
+        self.normal_frame_rects: dict[str, tuple] = {}  # id → (x, y, w, h) for normal frames
+        self.normal_source_w: int = 0              # normal map source width
+        self.normal_source_h: int = 0              # normal map source height
+        self.emissive_image: Optional[str] = None  # optional path to emissive PNG
+        self.emissive_frame_rects: dict[str, tuple] = {}  # id → (x, y, w, h) for emissive frames
+        self.emissive_source_w: int = 0            # emissive map source width
+        self.emissive_source_h: int = 0            # emissive map source height
         self.world_states: Dict[str, WorldStateRef] = {}   # world-state name → descriptor
+        self.variants: list = []                     # palette variants: [{name, path}]
 
     @classmethod
     def from_file(cls, path: str) -> "SpriteSheetManifest":
@@ -112,6 +121,8 @@ class SpriteSheetManifest:
         m.source_h = src.get("h", 0)
         m.applies_to = data.get("appliesTo", [])
         m.depth_image = data.get("depthImage")
+        m.normal_image = data.get("normalImage")
+        m.emissive_image = data.get("emissiveImage")
 
         # Parse world-state descriptors (optional; SHADED world-state hooks)
         for ws_name, ws_entry in data.get("worldStates", {}).items():
@@ -124,6 +135,16 @@ class SpriteSheetManifest:
         depth_src = data.get("depthSourceImage", {})
         m.depth_source_w = depth_src.get("w", 0)
         m.depth_source_h = depth_src.get("h", 0)
+
+        # Parse normal-map image dimensions (optional)
+        normal_src = data.get("normalSourceImage", {})
+        m.normal_source_w = normal_src.get("w", 0)
+        m.normal_source_h = normal_src.get("h", 0)
+
+        # Parse emissive image dimensions (optional)
+        emissive_src = data.get("emissiveSourceImage", {})
+        m.emissive_source_w = emissive_src.get("w", 0)
+        m.emissive_source_h = emissive_src.get("h", 0)
 
         # Build frame id → key map
         for f in data.get("frames", []):
@@ -150,6 +171,27 @@ class SpriteSheetManifest:
                 r = depth_rects.get(fid)
                 if r:
                     m.depth_frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
+
+        # Resolve normal-map frame rects (if present)
+        normal_rects = data.get("normalFrameRects", {})
+        if normal_rects:
+            for fid in m.frame_ids:
+                r = normal_rects.get(fid)
+                if r:
+                    m.normal_frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
+
+        # Resolve emissive frame rects (if present)
+        emissive_rects = data.get("emissiveFrameRects", {})
+        if emissive_rects:
+            for fid in m.frame_ids:
+                r = emissive_rects.get(fid)
+                if r:
+                    m.emissive_frame_rects[fid] = (r["x"], r["y"], r["w"], r["h"])
+
+        # Parse palette variants (optional; runtime color variants)
+        variants = data.get("variants")
+        if variants:
+            m.variants = list(variants)
 
         # Parse animations
         for anim_name, anim_data in data.get("animations", {}).items():

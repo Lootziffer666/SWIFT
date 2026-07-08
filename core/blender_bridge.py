@@ -56,7 +56,9 @@ class RenderJob:
     camera_angle: str = "front"
     pixel_size: int = 4
     blender_path: Optional[str] = None
-    enable_depth: bool = False  # Enable Z-buffer depth pass
+    enable_depth: bool = False    # Enable Z-buffer depth pass
+    enable_normal: bool = False   # Enable normal-map pass
+    enable_emissive: bool = False # Enable emissive pass
 
     def validate(self):
         if not os.path.isfile(self.char_fbx):
@@ -71,7 +73,9 @@ class RenderResult:
     frames_dir: str
     frame_count: int
     frame_paths: list = field(default_factory=list)
-    depth_frame_paths: list = field(default_factory=list)  # Depth pass frames (8-bit grayscale)
+    depth_frame_paths: list = field(default_factory=list)    # Depth pass frames (8-bit grayscale)
+    normal_frame_paths: list = field(default_factory=list)   # Normal-map pass frames (RGB)
+    emissive_frame_paths: list = field(default_factory=list) # Emissive pass frames (RGB)
     metadata: dict = field(default_factory=dict)
     error: Optional[str] = None
 
@@ -86,6 +90,20 @@ class RenderResult:
         """Return sorted list of depth frame PNG paths."""
         return sorted(
             p for p in self.depth_frame_paths
+            if p.endswith(".png")
+        )
+
+    def normal_frames(self):
+        """Return sorted list of normal-map frame PNG paths."""
+        return sorted(
+            p for p in self.normal_frame_paths
+            if p.endswith(".png")
+        )
+
+    def emissive_frames(self):
+        """Return sorted list of emissive frame PNG paths."""
+        return sorted(
+            p for p in self.emissive_frame_paths
             if p.endswith(".png")
         )
 
@@ -127,6 +145,10 @@ class BlenderBridge:
             cmd += ["--end", str(job.frame_end)]
         if job.enable_depth:
             cmd += ["--depth-pass"]
+        if job.enable_normal:
+            cmd += ["--normal-pass"]
+        if job.enable_emissive:
+            cmd += ["--emissive-pass"]
 
         try:
             proc = subprocess.Popen(
@@ -166,12 +188,28 @@ class BlenderBridge:
                     str(p) for p in Path(depth_dir).glob("frame_*_depth.png")
                 ) if os.path.isdir(depth_dir) else []
 
+            normal_frames = []
+            if job.enable_normal:
+                normal_dir = os.path.join(out_dir, "normal")
+                normal_frames = sorted(
+                    str(p) for p in Path(normal_dir).glob("frame_*_normal.png")
+                ) if os.path.isdir(normal_dir) else []
+
+            emissive_frames = []
+            if job.enable_emissive:
+                emissive_dir = os.path.join(out_dir, "emissive")
+                emissive_frames = sorted(
+                    str(p) for p in Path(emissive_dir).glob("frame_*_emissive.png")
+                ) if os.path.isdir(emissive_dir) else []
+
             return RenderResult(
                 success=True,
                 frames_dir=out_dir,
                 frame_count=len(frames),
                 frame_paths=frames,
                 depth_frame_paths=depth_frames,
+                normal_frame_paths=normal_frames,
+                emissive_frame_paths=emissive_frames,
                 metadata=meta,
             )
 
