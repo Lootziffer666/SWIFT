@@ -17,6 +17,21 @@ python main.py render \
 
 Das erzeugte Manifest kann sofort in SHADED geladen werden – keine weitere Konfiguration nötig.
 
+## Ecosystem & Orchestration
+
+SWIFT ist der **Character-/Actor-Produktionsknoten** im agentischen Spiele-Studio (beschrieben in `assetpilot.md`). Es nimmt 3D-Charaktermodelle entgegen und liefert animierte Sprite-Sheets + JSON-Manifeste, die SHADED über `window.SHADED.addActor({ image, manifest, ... })` als rein optische Actors in die Welt einfügt. SWIFT verändert dabei keine Weltzustände – es ist der reine Darstellungsknoten für Figuren (siehe Invariante 2 unten).
+
+Die sechs Rollen des Ökosystems und SWIFT's Verhältnis zu ihnen:
+
+- **mini-me** (Ideengenerator): Liefert Charakterkonzepte; SWIFT realisiert sie als renderbare FBX→Sprite-Sheet-Actors.
+- **Asset Pilot** (Produktionsleiter, SQLite, ~2470 Assets): Orchestriert SWIFT als einen der erzeugenden Generatoren für Actor-Assets.
+- **SHADED** (Weltkleber / Weltzustands-Kohärenz): Konsumiert SWIFT's Sprite-Sheets + Manifeste via `addActor()` als optische Actors – ohne dass SWIFT SHADED's Material-Klassifikation beeinflusst.
+- **3D-RE-GEN** (räumlicher Bild→3D-Sensor): Liefert die räumliche Basis (Tiefe, Objektgrenzen); SWIFT nutzt 3D-Modelle als Eingabe und erzeugt die animierte Figurendarstellung.
+- **ANVIL** (Orchestrator der Generatoren): Treibt SWIFT als Generator-Knoten (Charakter-/Actor-Produktion) im Gesamtprozess.
+- **CUE-AGENT** (Playability-Gatekeeper): Prüft die von SWIFT erzeugten Actors auf zeitliche/Spiel-Konsistenz im fertigen Raum.
+
+Das **TRON-Prinzip** gilt auch für SWIFT: Bedeutung, Raum und Weltzustand bleiben explizit & deterministisch – die KI (Blender-Render, optionales Neural Rendering) ist nur der letzte Darstellungsschritt. Die vollständige Orchestrierungs-/CLI-Vereinbarung ist in `docs/ORCHESTRATION.md` beschrieben; eine knappe Zusammenfassung von SWIFT's Platz im Ökosystem findet sich in `docs/ECOSYSTEM.md`.
+
 ## Installation
 
 ```bash

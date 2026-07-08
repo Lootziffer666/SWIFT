@@ -822,6 +822,8 @@ visuelle Kohärenz
 
 Dadurch wird aus zusammengewürfelten Assets eine glaubwürdige Welt.
 
+Ergänzend liefert SWIFT die animierten Charakter-/Actor-Darstellungen: Sprite-Sheets + JSON-Manifeste, die SHADED via addActor() als optische Actors in die so definierte Welt einfügt. SWIFT ist damit der reine Figuren-Darstellungsknoten und greift nicht in SHADED's Weltzustände ein.
+
 
 ---
 
@@ -1506,6 +1508,8 @@ Tageszeit
 
 Dadurch entsteht eine visuell konsistente Welt unabhängig von der Assetquelle.
 
+SWIFT (Sprite-Werkzeug für FBX → animierte Sprite-Sheets) ist der Charakter-/Actor-Produktionsknoten dieser Pipeline: Es erzeugt animierte Sprite-Sheets (PNG) samt JSON-Manifest (v1.4.0), die SHADED über window.SHADED.addActor({ image, manifest, ... }) als rein optische Actors aufnimmt. SWIFT verändert dabei keine Weltzustände – es liefert ausschließlich die Darstellung der Figur.
+
 
 ---
 
@@ -1657,6 +1661,8 @@ CUE-AGENT
 ↓
 
 Spielbarer Prototyp
+
+SWIFT bildet den Actor-Produktionsschritt dieser Kette: Aus FBX-Modellen erzeugt es animierte Sprite-Sheets + Manifeste, die SHADED über addActor() konsumiert. Es ist der reine Darstellungsknoten für Figuren und verändert keine Weltzustände.
 
 
 ---
