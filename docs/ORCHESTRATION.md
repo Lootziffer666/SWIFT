@@ -395,8 +395,8 @@ SHADED's `addActor()`. The authoritative writer is `core/exporter.export_manifes
     { "name": "green",  "path": "hero_green.png" }
   ],
   "worldStates": {
-    "dust":  { "name": "dust",  "palette": "dust",  "intensity": [0.0, 1.0] },
-    "aging": { "name": "aging", "palette": "aging", "intensity": [0.0, 1.0] }
+    "dust":  { "name": "dust",  "transform": "dust",  "intensity": 0.5, "variant_path": "hero_dust.png" },
+    "aging": { "name": "aging", "transform": "aging", "intensity": 0.7, "variant_path": "hero_aging.png" }
   }
 }
 ```
@@ -433,14 +433,21 @@ is `worldStates`. Each entry serializes via `WorldStateRef.to_dict()`:
 ```json
 "<stateName>": {
   "name": "<stateName>",
-  "palette": "<presetKey|null>",   // optional palette preset key
-  "intensity": [0.0, 1.0]          // [min, max] intensity range
+  "transform": "<transformName>",   // procedural transform (e.g. "dust"); falls back to legacy "palette"
+  "intensity": 0.5,                  // scalar intensity in [0, 1]
+  "variant_path": "<stateName>.png" // basename of the generated variant PNG
 }
 ```
 
 SHADED uses `worldStates` to parameterize the actor by explicit world states without
 SWIFT re-rendering. If a state name is unknown to the palette table, SWIFT prints a
 warning and skips it (the manifest entry is simply omitted).
+
+> **Serialization note:** `WorldStateRef.to_dict()` emits `transform` (not `palette`)
+> plus a **scalar** `intensity` (not a `[min, max]` range) and the generated
+> `variant_path`. The legacy form (`palette` key + `intensity` range) still loads
+> (backward compatible) but is never produced by the current CLI. This document is
+> authoritative for what `render --world-states` actually writes.
 
 ---
 
