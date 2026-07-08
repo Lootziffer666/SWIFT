@@ -9,6 +9,130 @@ import os
 
 
 @dataclass
+class WorldStatePalette:
+    """
+    Data-driven descriptor for a SHADED world-state visual modifier.
+    Each field is a 0..1 (or -1..1) coefficient applied to the whole sheet,
+    scaled by the requested intensity:
+      - desaturate : blend toward luminance (0 = none, 1 = grayscale)
+      - brightness : additive exposure (-1 darken .. +1 lighten)
+      - warmth     : warm/cool shift (negative = cooler, positive = warmer)
+      - tint       : RGB color to blend toward (None = no tint)
+      - tint_strength : blend amount toward `tint` (0..1)
+    """
+    name: str
+    description: str
+    desaturate: float = 0.0
+    brightness: float = 0.0
+    warmth: float = 0.0
+    tint: Optional[Tuple[int, int, int]] = None
+    tint_strength: float = 0.0
+
+
+# Registry of SHADED world-state palettes, keyed by state name. Self-documenting
+# and additive: new states (haze, weather, time-of-day) can be registered here
+# without touching the manifest schema.
+WORLD_STATE_REGISTRY: Dict[str, WorldStatePalette] = {
+    "dust": WorldStatePalette(
+        name="dust",
+        description="Staub — warm desaturation (fine dust dulls + warms the sheet)",
+        desaturate=0.35,
+        warmth=0.25,
+    ),
+    "heat": WorldStatePalette(
+        name="heat",
+        description="Hitze — heat shimmer, warm push + slight exposure lift",
+        warmth=0.6,
+        brightness=0.10,
+    ),
+    "soot": WorldStatePalette(
+        name="soot",
+        description="Ruß — soot darkening + heavy desaturation",
+        brightness=-0.30,
+        desaturate=0.50,
+    ),
+    "aging": WorldStatePalette(
+        name="aging",
+        description="Alterung — aging darkening + yellow-brown tint",
+        brightness=-0.15,
+        tint=(120, 100, 60),
+        tint_strength=0.25,
+    ),
+    "sunbleach": WorldStatePalette(
+        name="sunbleach",
+        description="Sonnenbleiche — sun-bleaching lightens + desaturates",
+        brightness=0.25,
+        desaturate=0.40,
+    ),
+    "humidity": WorldStatePalette(
+        name="humidity",
+        description="Feuchtigkeit — cool blue-green damp tint",
+        warmth=-0.30,
+        tint=(80, 120, 140),
+        tint_strength=0.20,
+    ),
+}
+
+
+def get_world_state_palette(name: str) -> WorldStatePalette:
+    """Return the registered WorldStatePalette for `name` (raises KeyError)."""
+    if name not in WORLD_STATE_REGISTRY:
+        raise KeyError(f"Unknown world state: {name!r}")
+    return WORLD_STATE_REGISTRY[name]
+
+
+def _clamp(v: float) -> int:
+    return max(0, min(255, int(round(v))))
+
+
+def remap_world_state(
+    frame: Image.Image,
+    state: WorldStatePalette,
+    intensity: float = 1.0,
+) -> Image.Image:
+    """
+    Apply a SHADED world-state modifier to a frame/sheet, scaled by `intensity`.
+    Intensity is clamped to the [0, 1] effective range the descriptor was tuned
+    for; the manifest's `intensity` range records the supported spread.
+    """
+    if intensity <= 0:
+        return frame
+    img = frame.convert("RGBA")
+    rgb = img.convert("RGB")
+    r, g, b = rgb.split()
+
+    if state.brightness:
+        delta = state.brightness * intensity * 255
+        r = Image.eval(r, lambda p, d=delta: _clamp(p + d))
+        g = Image.eval(g, lambda p, d=delta: _clamp(p + d))
+        b = Image.eval(b, lambda p, d=delta: _clamp(p + d))
+
+    if state.warmth:
+        w = state.warmth * intensity * 255 * 0.3
+        r = Image.eval(r, lambda p, w=w: _clamp(p + w))
+        b = Image.eval(b, lambda p, w=w: _clamp(p - w))
+
+    rgb = Image.merge("RGB", (r, g, b))
+
+    if state.desaturate:
+        amt = min(1.0, state.desaturate * intensity)
+        if amt > 0:
+            gray = rgb.convert("L").convert("RGB")
+            rgb = Image.blend(rgb, gray, amt)
+
+    if state.tint is not None and state.tint_strength:
+        amt = min(1.0, state.tint_strength * intensity)
+        if amt > 0:
+            tint_img = Image.new("RGB", rgb.size, state.tint)
+            rgb = Image.blend(rgb, tint_img, amt)
+
+    out = Image.new("RGBA", rgb.size)
+    out.paste(rgb, (0, 0))
+    out.putalpha(img.split()[3])
+    return out
+
+
+@dataclass
 class Palette:
     """Color palette definition mapping source colors to target colors."""
     name: str

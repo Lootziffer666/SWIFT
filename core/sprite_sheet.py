@@ -8,7 +8,7 @@ frame rects are scaled proportionally (handles @2x / retina exports).
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 from PIL import Image
 
@@ -19,6 +19,41 @@ class AnimationDef:
     frames: list        # list of frame IDs, e.g. ["F01", "F02"]
     fps: int
     loop: bool
+
+
+@dataclass
+class WorldStateRef:
+    """
+    Maps a SHADED world-state name (e.g. "dust", "aging") to either a palette
+    preset key or a modifier descriptor so SWIFT actors are parameterizable by
+    explicit world states. Serializes cleanly to a JSON object:
+        {"name": "dust", "palette": "dust", "intensity": [0.0, 1.0]}
+    """
+    name: str
+    palette: Optional[str] = None                      # preset palette key (e.g. "dust")
+    intensity: Tuple[float, float] = (0.0, 1.0)         # intensity range [min, max]
+
+    def to_dict(self) -> dict:
+        d: Dict = {"name": self.name}
+        if self.palette is not None:
+            d["palette"] = self.palette
+        d["intensity"] = list(self.intensity)
+        return d
+
+    @classmethod
+    def from_dict(cls, data) -> "WorldStateRef":
+        if isinstance(data, str):
+            return cls(name=data)
+        intensity = data.get("intensity", [0.0, 1.0])
+        if isinstance(intensity, (list, tuple)):
+            intensity = (float(intensity[0]), float(intensity[1]))
+        else:
+            intensity = (0.0, 1.0)
+        return cls(
+            name=data.get("name", ""),
+            palette=data.get("palette"),
+            intensity=intensity,
+        )
 
 
 class SpriteSheetManifest:
@@ -42,6 +77,7 @@ class SpriteSheetManifest:
         self.depth_frame_rects: dict[str, tuple] = {}  # id → (x, y, w, h) for depth frames
         self.depth_source_w: int = 0               # depth map source width
         self.depth_source_h: int = 0               # depth map source height
+        self.world_states: Dict[str, WorldStateRef] = {}   # world-state name → descriptor
 
     @classmethod
     def from_file(cls, path: str) -> "SpriteSheetManifest":
@@ -57,6 +93,13 @@ class SpriteSheetManifest:
         m.source_h = src.get("h", 0)
         m.applies_to = data.get("appliesTo", [])
         m.depth_image = data.get("depthImage")
+
+        # Parse world-state descriptors (optional; SHADED world-state hooks)
+        for ws_name, ws_entry in data.get("worldStates", {}).items():
+            if isinstance(ws_entry, dict) and not ws_entry.get("name"):
+                ws_entry = dict(ws_entry)
+                ws_entry["name"] = ws_name
+            m.world_states[ws_name] = WorldStateRef.from_dict(ws_entry)
 
         # Parse depth image dimensions (optional)
         depth_src = data.get("depthSourceImage", {})

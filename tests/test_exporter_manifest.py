@@ -104,3 +104,43 @@ class TestExportManifest:
         with open(out_path) as f:
             data = json.load(f)
             assert data.get("depthImage") == "depth.png"
+
+    def test_manifest_round_trip_preserves_world_states(self, tmp_path):
+        from core.exporter import export_manifest
+        from core.sprite_sheet import SpriteSheetManifest, WorldStateRef
+
+        frames = _make_frames(tmp_path, 3)
+        out_path = str(tmp_path / "ws_manifest.json")
+        world_states = {
+            "dust": WorldStateRef(name="dust", palette="dust", intensity=(0.0, 1.0)),
+            "aging": WorldStateRef(name="aging", palette="aging", intensity=(0.0, 1.0)),
+        }
+        export_manifest(
+            frames,
+            out_path,
+            anim_name="walk",
+            world_states=world_states,
+        )
+
+        m = SpriteSheetManifest.from_file(out_path)
+        assert set(m.world_states.keys()) == {"dust", "aging"}
+        assert m.world_states["dust"].palette == "dust"
+        assert m.world_states["dust"].intensity == (0.0, 1.0)
+        assert m.world_states["aging"].name == "aging"
+
+        with open(out_path) as f:
+            data = json.load(f)
+            assert "worldStates" in data
+            assert data["worldStates"]["dust"]["name"] == "dust"
+            assert data["worldStates"]["dust"]["palette"] == "dust"
+
+    def test_manifest_without_world_states_still_loads(self, tmp_path):
+        from core.exporter import export_manifest
+        from core.sprite_sheet import SpriteSheetManifest
+
+        frames = _make_frames(tmp_path, 2)
+        out_path = str(tmp_path / "no_ws.json")
+        export_manifest(frames, out_path, anim_name="idle")
+
+        m = SpriteSheetManifest.from_file(out_path)
+        assert m.world_states == {}
