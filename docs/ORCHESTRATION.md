@@ -28,26 +28,113 @@ python main.py <subcommand> [options]
 | No subcommand given | `0` | Prints help to stdout, exits 0. |
 | Success | `0` | Processed without raising. |
 | Missing required arg / argparse error | `2` | Standard argparse behavior. |
-| Explicit failure (`sys.exit(1)`) | `1` | Blender unavailable, missing API key, tracking/render failure, missing `--anim`/`--frame` for spritesheet sub-actions. |
-| Unhandled exception | non-zero | Python traceback; treat as failure. |
+| Missing input (file/value) | `2` | Explicit `InputMissingError`: model FBX, video, sprite-sheet image, manifest, or required `--anim`/`--frame`/API-key missing. |
+| External tool missing | `3` | `ToolMissingError`: Blender unavailable for `render`, PySide6 unavailable for `gui`. |
+| Generic failure | `1` | Any other runtime error (tracker/render failure, unhandled exception, etc.). |
 
 **Rule for ANVIL:** trust the exit code, not the textual output. `0` == success,
 non-zero == failure. Retry/abort accordingly.
 
-### stdout / stderr convention (current behavior)
+### stdout / stderr convention
 
-In the current implementation **all** human-readable output — including `ERROR:`
-lines — is written to **stdout**. Nothing is explicitly routed to stderr. Progress
-lines are also written to stdout (interleaved with `Done:` summaries).
+There are two output modes:
 
-> **Implication for ANVIL:** do not rely on a stdout/stderr split to detect errors.
-> Branch solely on the exit code. See [Future contract additions](#6-future-contract-additions)
-> for the recommended hardening (errors to stderr + stable machine-readable summary).
+- **Default (human mode):** all human-readable status/progress text is written to
+  **stdout**; error/diagnostic lines are written to **stderr** (prefixed `ERROR:`).
+- **Machine-readable mode (`--json` / `--json-summary`):** on success a **single**
+  JSON object is written to **stdout** (`status:"success"` + command-specific keys,
+  see [§2](#2-commands)). All progress/diagnostic text is redirected to **stderr**. On
+  failure a `{"status":"error","error":<msg>}` object is written to **stderr** and the
+  process exits with the code above (2 missing input, 3 tool missing, 1 generic).
 
-Output artifacts are produced as **files on disk**, not printed to stdout. stdout only
-carries status text and a final `Done: <path>` line for most commands.
+```bash
+# Success → stdout carries ONLY the JSON summary; diagnostics on stderr.
+python main.py spritesheet list sheet.png --manifest m.json --json
+#   stdout: {"status":"success","command":"spritesheet","action":"list",...}
+#   stderr: (progress/summary lines)
+
+# Failure → structured error on stderr, non-zero exit.
+python main.py render --model missing.fbx --json
+#   stderr: {"status":"error","error":"Model FBX not found: missing.fbx"}
+#   exit:   2
+```
+
+> **Implication for ANVIL:** in machine-readable mode, branch on the exit code AND
+> parse stdout (success) or stderr (failure) for the structured JSON. In human mode,
+> rely solely on the exit code.
+
+Output artifacts are produced as **files on disk**, not printed to stdout. In human
+mode, stdout additionally carries `Done: <path>` style summaries for convenience; in
+`--json` mode those are suppressed from stdout.
 
 ---
+
+## 2.0 Machine-readable summary (`--json` / `--json-summary`)
+
+Every subcommand accepts `--json` (alias `--json-summary`). When set:
+
+- **Success** → exactly one JSON object is printed to **stdout** and the process
+  exits `0`. All progress/diagnostic text is routed to **stderr**.
+- **Failure** → `{"status":"error","error":<msg>}` is printed to **stderr** and the
+  process exits with the code in [§1](#1-invocation--exit-codes) (`2` missing input,
+  `3` tool missing, `1` generic). **Nothing** is written to stdout on failure.
+
+The success object always contains:
+
+```json
+{
+  "status": "success",
+  "command": "<subcommand>"
+}
+```
+
+plus command-specific keys. The `render` and `spritesheet` summaries carry the
+orchestration-relevant fields:
+
+| Key | Type | Present for | Meaning |
+|-----|------|-------------|---------|
+| `artifacts` | `[{type, path}]` | all | Output files produced (e.g. `sprite_sheet`, `manifest`, `depth_sheet`, `variant_sheet`, `world_state_sheet`, `bvh`, `gif`, `frame`). |
+| `sheet_path` | string \| null | render, spritesheet, video2sprite | Primary sheet/image path. |
+| `manifest_path` | string \| null | render, spritesheet | Manifest JSON path (null if none). |
+| `depth_path` | string \| null | render | Depth sheet path (only with `--depth-pass`). |
+| `world_states` | `[string]` | render | World-state names requested via `--world-states`. |
+| `fps` | int \| null | render, spritesheet, mocap, video2sprite | Playback fps. |
+| `frame_count` | int \| null | render, spritesheet, mocap, video2sprite | Number of frames. |
+| `animation_names` | `[string]` | render, spritesheet | Animation keys in the manifest. |
+| `mapping_version` | string \| null | render, spritesheet | `mappingVersion` from the manifest. |
+
+**Example — `render` (success):**
+
+```json
+{
+  "status": "success",
+  "command": "render",
+  "artifacts": [
+    {"type": "sprite_sheet", "path": "/out/hero.png"},
+    {"type": "manifest",     "path": "/out/hero_manifest.json"},
+    {"type": "depth_sheet",  "path": "/out/hero_depth.png"}
+  ],
+  "manifest_path": "/out/hero_manifest.json",
+  "sheet_path": "/out/hero.png",
+  "depth_path": "/out/hero_depth.png",
+  "world_states": ["dust", "aging"],
+  "fps": 12,
+  "frame_count": 24,
+  "animation_names": ["walk"],
+  "mapping_version": "1.4.0"
+}
+```
+
+**Example — `render` (failure, Blender missing):**
+
+```json
+{"status": "error", "error": "Blender not available: <version string>"}
+```
+(exit code `3`, written to stderr.)
+
+> **Determinism note:** in `--json` mode stdout contains *only* the single summary
+> object — no progress lines, no `Done:` text. ANVIL may parse stdout directly with a
+> strict JSON decoder.
 
 ## 2. Commands
 
@@ -97,8 +184,14 @@ python main.py render \
 | `--variants` | no | — | Comma-separated palette variants (`red`,`green`,`purple`,`gold`). |
 | `--world-states` | no | — | Comma-separated SHADED world states (e.g. `dust,aging,heat`). |
 
-**Failure modes:** `sys.exit(1)` if Blender is unavailable after `renderer.check()`.
-Otherwise returns the sheet path; non-zero on unhandled render error.
+**Failure modes:** `sys.exit(3)` (`ToolMissingError`) if Blender is unavailable after
+`renderer.check()`; `sys.exit(2)` (`InputMissingError`) if `--model` FBX does not
+exist; otherwise non-zero on unhandled render error (`sys.exit(1)`).
+
+**Machine-readable mode:** pass `--json` / `--json-summary` to emit the summary in
+[§2.0](#20-machine-readable-summary---json----json-summary) (artifacts, sheet/manifest/
+depth paths, `world_states`, `fps`, `frame_count`, `animation_names`, `mapping_version`)
+to stdout; all progress goes to stderr.
 
 **Output artifacts:** see [§3.1](#31-render-artifacts).
 
@@ -200,8 +293,13 @@ python main.py spritesheet extract <image> --manifest M.json --frame FID [--outp
 | `--format` | no (`export`) | `gif` | `sprite_sheet` or `gif`. |
 | `--output` | no | derived | Output path. |
 
-**Failure modes:** `sys.exit(1)` if `--anim` missing for `export`, or `--frame` missing
-for `extract`. On success prints a summary and exits `0`.
+**Failure modes:** `sys.exit(2)` (`InputMissingError`) if `--anim` missing for
+`export`, `--frame` missing for `extract`, the sheet image is missing, or the manifest
+is missing. On success prints a summary and exits `0`.
+
+**Machine-readable mode:** pass `--json` / `--json-summary` to emit the success summary
+(`artifacts`, `sheet_path`, `manifest_path`, `mapping_version`, `animation_names`,
+`frame_count`, `fps`) to stdout instead of the human summary.
 
 **Output artifacts:**
 - `list` → prints animation/frame summary to stdout (no file).
@@ -387,19 +485,19 @@ Contract points ANVIL must honor:
 
 ## 6. Future contract additions
 
-These are **proposed**, not yet implemented. ANVIL should not depend on them yet.
+Implemented items are marked ✅. Remaining items are **proposed**, not yet implemented.
 
-1. **Errors to stderr.** Currently all output (including `ERROR:` lines) goes to stdout.
-   Recommend routing error/diagnostic text to stderr and reserving stdout for a
-   machine-readable result.
-2. **Stable machine-readable success summary.** None of the commands emit a parseable
-   JSON result on stdout today (they print `Done: <path>` text). Recommend a
-   `--json` flag (or a trailing JSON object on stdout) reporting
-   `{ "ok": true, "artifacts": [...], "manifest": "<path>" }` so ANVIL can locate
-   outputs without string-scraping or path convention guessing.
-3. **`analyze` structured output.** `analyze` currently prints human text only. A
-   `--json` producing the `StyleParams` object would let ANVIL feed it back into a
-   later `render` deterministically.
+1. ✅ **Errors to stderr + machine-readable summary.** All subcommands accept
+   `--json` / `--json-summary`. In that mode progress/diagnostic text goes to stderr
+   and a single JSON object is emitted to stdout on success, or
+   `{"status":"error","error":<msg>}` to stderr on failure (see [§2.0](#20-machine-readable-summary---json----json-summary)).
+   In human mode, `ERROR:` lines are also routed to stderr.
+2. ✅ **Stable machine-readable success summary.** Implemented as documented in
+   [§2.0](#20-machine-readable-summary---json----json-summary) with `artifacts`,
+   `sheet_path`, `manifest_path`, `depth_path`, `world_states`, `fps`,
+   `frame_count`, `animation_names`, `mapping_version`.
+3. ✅ **`analyze` structured output.** `analyze --json` emits the `StyleParams`
+   object under the `style` key of the success summary (requires `ANTHROPIC_API_KEY`).
 4. **Manifest for `video2sprite` / `gif`.** Only `render` (sprite_sheet) emits a SHADED
    manifest. A flag to emit a manifest for `video2sprite` output would make those sheets
    directly `addActor`-consumable.
