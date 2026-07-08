@@ -8,7 +8,7 @@ frame rects are scaled proportionally (handles @2x / retina exports).
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from PIL import Image
 
@@ -24,35 +24,54 @@ class AnimationDef:
 @dataclass
 class WorldStateRef:
     """
-    Maps a SHADED world-state name (e.g. "dust", "aging") to either a palette
-    preset key or a modifier descriptor so SWIFT actors are parameterizable by
-    explicit world states. Serializes cleanly to a JSON object:
-        {"name": "dust", "palette": "dust", "intensity": [0.0, 1.0]}
+    Maps a SHADED world-state name (e.g. "dust", "aging") to a procedural
+    transform descriptor so SWIFT actors are parameterizable by explicit world
+    states. Serializes cleanly to a JSON object:
+        {"name": "dust", "transform": "dust", "intensity": 0.5,
+         "variant_path": "actor_dust.png", "params": {...}}
+
+    Backward compatible: legacy manifests stored `palette` (preset key) and an
+    `intensity` range [min, max]; both load fine, and `transform` defaults to
+    the preset key or the state name.
     """
     name: str
-    palette: Optional[str] = None                      # preset palette key (e.g. "dust")
-    intensity: Tuple[float, float] = (0.0, 1.0)         # intensity range [min, max]
+    transform: Optional[str] = None                    # procedural transform name (e.g. "dust")
+    intensity: float = 0.5                             # scalar intensity [0, 1]
+    palette: Optional[str] = None                      # legacy preset palette key (backward compat)
+    variant_path: Optional[str] = None                 # path (basename) of the generated variant PNG
+    params: Optional[Dict] = None                      # optional extra transform params
 
     def to_dict(self) -> dict:
         d: Dict = {"name": self.name}
-        if self.palette is not None:
+        if self.transform is not None:
+            d["transform"] = self.transform
+        elif self.palette is not None:
             d["palette"] = self.palette
-        d["intensity"] = list(self.intensity)
+        d["intensity"] = self.intensity
+        if self.variant_path is not None:
+            d["variant_path"] = self.variant_path
+        if self.params is not None:
+            d["params"] = self.params
         return d
 
     @classmethod
     def from_dict(cls, data) -> "WorldStateRef":
         if isinstance(data, str):
             return cls(name=data)
-        intensity = data.get("intensity", [0.0, 1.0])
-        if isinstance(intensity, (list, tuple)):
-            intensity = (float(intensity[0]), float(intensity[1]))
+        raw_intensity = data.get("intensity", 0.5)
+        if isinstance(raw_intensity, (list, tuple)):
+            # Legacy range format: keep tuple for backward-compatible round-trip.
+            intensity = (float(raw_intensity[0]), float(raw_intensity[1]))
         else:
-            intensity = (0.0, 1.0)
+            intensity = float(raw_intensity)
+        transform = data.get("transform") or data.get("palette")
         return cls(
             name=data.get("name", ""),
+            transform=transform,
             palette=data.get("palette"),
             intensity=intensity,
+            variant_path=data.get("variant_path"),
+            params=data.get("params"),
         )
 
 
