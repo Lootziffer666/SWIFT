@@ -157,7 +157,7 @@ python main.py render \
   [--blender PATH] \
   [--anim-name NAME] \
   [--skeleton-generator] [--height-cm CM] [--weight-kg KG] [--with-ik] [--mesh-bodies] \
-  [--depth-pass] \
+  [--depth-pass] [--normal-pass] [--emissive-pass] \
   [--variants "red,green,gold"] \
   [--world-states "dust,aging,heat"]
 ```
@@ -166,7 +166,7 @@ python main.py render \
 |----------|----------|---------|---------|
 | `--model` | **yes** | — | Character FBX path. |
 | `--anim` | no | — | Animation FBX path. If omitted, a built-in animation is used. |
-| `--output` | no | `<frames_dir>/output` | Output file path **stem**. `.png` / `_manifest.json` / `_depth.png` are appended. |
+| `--output` | no | `<frames_dir>/output` | Output file path **stem**. `.png` / `_manifest.json` / `_depth.png` / `_normal.png` / `_emissive.png` are appended. |
 | `--format` | no | `sprite_sheet` | `sprite_sheet` (PNG+JSON manifest), `gif`, or `frames_json`. |
 | `--width` | no | `64` | Frame width in px. |
 | `--height` | no | `64` | Frame height in px. |
@@ -181,7 +181,9 @@ python main.py render \
 | `--with-ik` | no | off | Apply 2-bone IK chains to limbs. |
 | `--mesh-bodies` | no | off | Generate capsule mesh bodies per bone. |
 | `--depth-pass` | no | off | Enable Z-buffer depth pass (8-bit grayscale PNG). |
-| `--variants` | no | — | Comma-separated palette variants (`red`,`green`,`purple`,`gold`). |
+| `--normal-pass` | no | off | Enable normal-map pass (RGB PNG). Adds `normalImage`/`normalSourceImage`/`normalFrameRects` to the manifest. |
+| `--emissive-pass` | no | off | Enable emissive pass (emission-only RGB PNG). Adds `emissiveImage`/`emissiveSourceImage`/`emissiveFrameRects` to the manifest. |
+| `--variants` | no | — | Comma-separated palette variants. Two forms: named presets (`red`,`green`,`purple`,`gold`) or custom hex maps `name=#Src:Dst` (multiple pairs with `;`); runtime LUT pass, no re-render. |
 | `--world-states` | no | — | Comma-separated SHADED world states (e.g. `dust,aging,heat`). |
 
 **Failure modes:** `sys.exit(3)` (`ToolMissingError`) if Blender is unavailable after
@@ -323,6 +325,8 @@ Given `--output path/to/hero` and `--format sprite_sheet`:
 | `path/to/hero.png` | always (sprite_sheet) | RGBA sprite sheet. |
 | `path/to/hero_manifest.json` | always (sprite_sheet) | Manifest v1.4.0 (see §4). |
 | `path/to/hero_depth.png` | `--depth-pass` | 8-bit grayscale depth sheet (same frame layout as color). |
+| `path/to/hero_normal.png` | `--normal-pass` | RGB normal-map sheet (same frame layout as color). |
+| `path/to/hero_emissive.png` | `--emissive-pass` | RGB emissive (emission-only) sheet (same frame layout as color). |
 | `path/to/hero_<variant>.png` | `--variants` | Palette-swapped variant sheets. |
 | `path/to/hero_<state>.png` | `--world-states` | SHADED world-state variant sheets. |
 
@@ -384,13 +388,25 @@ SHADED's `addActor()`. The authoritative writer is `core/exporter.export_manifes
   "animations": {
     "walk": { "frames": ["F01", "F02"], "fps": 12, "loop": true }
   },
-  "depthImage": "hero_depth.png",
-  "depthSourceImage": { "w": 512, "h": 256 },
-  "depthFrameRects": {
-    "F01": { "x": 0,   "y": 0, "w": 128, "h": 256 },
-    "F02": { "x": 128, "y": 0, "w": 128, "h": 256 }
-  },
-  "variants": [
+   "depthImage": "hero_depth.png",
+   "depthSourceImage": { "w": 512, "h": 256 },
+   "depthFrameRects": {
+     "F01": { "x": 0,   "y": 0, "w": 128, "h": 256 },
+     "F02": { "x": 128, "y": 0, "w": 128, "h": 256 }
+   },
+   "normalImage": "hero_normal.png",
+   "normalSourceImage": { "w": 512, "h": 256 },
+   "normalFrameRects": {
+     "F01": { "x": 0,   "y": 0, "w": 128, "h": 256 },
+     "F02": { "x": 128, "y": 0, "w": 128, "h": 256 }
+   },
+   "emissiveImage": "hero_emissive.png",
+   "emissiveSourceImage": { "w": 512, "h": 256 },
+   "emissiveFrameRects": {
+     "F01": { "x": 0,   "y": 0, "w": 128, "h": 256 },
+     "F02": { "x": 128, "y": 0, "w": 128, "h": 256 }
+   },
+   "variants": [
     { "name": "red",    "path": "hero_red.png" },
     { "name": "green",  "path": "hero_green.png" }
   ],
@@ -414,6 +430,12 @@ SHADED's `addActor()`. The authoritative writer is `core/exporter.export_manifes
 | `depthImage` | string | optional | Basename of the depth sheet PNG (present iff `--depth-pass`). |
 | `depthSourceImage` | `{w,h}` | optional | Pixel dimensions of the depth sheet. |
 | `depthFrameRects` | map id→`{x,y,w,h}` | optional | Same frame ids as `frameRects`; object form. |
+| `normalImage` | string | optional | Basename of the normal-map sheet PNG (present iff `--normal-pass`). |
+| `normalSourceImage` | `{w,h}` | optional | Pixel dimensions of the normal-map sheet. |
+| `normalFrameRects` | map id→`{x,y,w,h}` | optional | Same frame ids as `frameRects`; object form. |
+| `emissiveImage` | string | optional | Basename of the emissive sheet PNG (present iff `--emissive-pass`). |
+| `emissiveSourceImage` | `{w,h}` | optional | Pixel dimensions of the emissive sheet. |
+| `emissiveFrameRects` | map id→`{x,y,w,h}` | optional | Same frame ids as `frameRects`; object form. |
 | `variants` | array | optional | `[{name, path}]` palette variants (from `--variants`). |
 | `worldStates` | map name→`WorldStateRef` | optional | SHADED world-state hooks (from `--world-states`). See below. |
 

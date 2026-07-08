@@ -251,6 +251,43 @@ pytest tests/test_exporter_manifest.py -v
 
 ## Phase 2+ Features (implementiert)
 
+### Depth-Rendering (Tiefen-Pass)
+
+Über `--depth-pass` wird zusätzlich zum Farb-Sheet ein Z-Buffer-Pass als
+8-bit-Grayscale-PNG gerendert. Das Manifest erhält dann `depthImage`
+(Basename des Depth-Sheets), `depthSourceImage` (Dimensionen) und
+`depthFrameRects` (Frame-Layout, identisch zum Farb-Sheet) — SHADED nutzt diese
+für räumliches Layering (`depthLayer` in `addActor`).
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --anim walk \
+  --depth-pass \
+  --output out/hero
+# Erzeugt: out/hero.png, out/hero_manifest.json, out/hero_depth.png
+# Manifest: "depthImage": "hero_depth.png", "depthFrameRects": {...}
+```
+
+### Multi-Pass Rendering (Normal- & Emissive-Pass)
+
+Mit `--normal-pass` bzw. `--emissive-pass` werden zusätzliche Render-Passes
+erzeugt — eine Normale-Map (RGB-PNG) und ein reines Emissions-Pass
+(Emissions-only RGB-PNG). Das Manifest ergänzt pro Pass
+`normalImage`/`normalSourceImage`/`normalFrameRects` bzw.
+`emissiveImage`/`emissiveSourceImage`/`emissiveFrameRects` (alle optional, nur
+bei aktiviertem Pass vorhanden):
+
+```bash
+python main.py render \
+  --model character.fbx \
+  --anim walk \
+  --normal-pass --emissive-pass \
+  --output out/hero
+# Erzeugt: out/hero_normal.png, out/hero_emissive.png
+# Manifest: "normalImage": "hero_normal.png", "emissiveImage": "hero_emissive.png", ...
+```
+
 ### Procedurale Skelette (Parametrische Charakter-Generierung)
 
 Über `--skeleton-generator` wird kein FBX geladen, sondern ein parametrisches
@@ -328,12 +365,16 @@ deterministisch (timestamp-frei), und die `variants`-Liste round-trip-t über
 
 Blender wird NICHT als Python-Modul importiert, sondern via Subprocess aufgerufen (`blender --background --python ...`). Das erlaubt flexible Blender-Versionen und sichere Parallelisierung.
 
-## Zukunfts-Erweiterungen (Phase 2+)
+## Zukunfts-Erweiterungen
 
-- **Depth-Rendering:** Blender Z-Buffer-Pass zu 8-bit Grayscale PNG (Phase B2) — *siehe `docs/ORCHESTRATION.md` (implementiert)*
-- **Procedurale Skelette:** Parametrische Charakter-Generierung (IK, Proportionen) — *implementiert, siehe Abschnitt oben*
-- **Palette-Swapping:** Runtime-Farbvarianten ohne Neubau (schnelle Personalisierung) — *implementiert (siehe `docs/ORCHESTRATION.md`)*
-- **Multi-Pass Rendering:** Separate Passes für Normal-Maps, Emissive (für erweiterte Visuals) — *implementiert (`--normal-pass`/`--emissive-pass`)*
+Die ursprünglich hier gelisteten Phase-2+-Features — Depth-Rendering,
+Procedurale Skelette, Palette-Swapping und Multi-Pass Rendering
+(Normal/Emissive) — sind **bereits implementiert** und unter
+[*Phase 2+ Features (implementiert)*](#phase-2-features-implementiert)
+dokumentiert. Hier folgen nur noch offene, nicht umgesetzte Ideen:
+
+- *Platzhalter für künftige Erweiterungen (z. B. weiteres Multi-Channel-Rendering,
+  komplexere IK-Topologien).*
 
 ## Git & Branches
 
