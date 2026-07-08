@@ -75,6 +75,8 @@ def _build_render_summary(args, sheet_path: str) -> dict:
 
     artifacts = [{"type": "sprite_sheet", "path": sheet_path}]
     depth_path = None
+    normal_path = None
+    emissive_path = None
     mapping_version = None
     animation_names = []
     frame_count = None
@@ -90,6 +92,14 @@ def _build_render_summary(args, sheet_path: str) -> dict:
         if depth_image:
             depth_path = os.path.join(os.path.dirname(manifest_path), depth_image)
             artifacts.append({"type": "depth_sheet", "path": depth_path})
+        normal_image = manifest.get("normalImage")
+        if normal_image:
+            normal_path = os.path.join(os.path.dirname(manifest_path), normal_image)
+            artifacts.append({"type": "normal_sheet", "path": normal_path})
+        emissive_image = manifest.get("emissiveImage")
+        if emissive_image:
+            emissive_path = os.path.join(os.path.dirname(manifest_path), emissive_image)
+            artifacts.append({"type": "emissive_sheet", "path": emissive_path})
 
     world_states = [s.strip() for s in (args.world_states or "").split(",") if s.strip()]
     variants = [v.strip() for v in (args.variants or "").split(",") if v.strip()]
@@ -108,6 +118,8 @@ def _build_render_summary(args, sheet_path: str) -> dict:
         "manifest_path": manifest_path if manifest is not None else None,
         "sheet_path": sheet_path,
         "depth_path": depth_path,
+        "normal_path": normal_path,
+        "emissive_path": emissive_path,
         "world_states": world_states,
         "fps": fps,
         "frame_count": frame_count,
@@ -153,11 +165,17 @@ def cmd_render(args, reporter: Reporter):
         camera_angle=args.camera,
         pixel_size=args.pixel_size,
         enable_depth=args.depth_pass,
+        enable_normal=args.normal_pass,
+        enable_emissive=args.emissive_pass,
     )
 
     reporter.say(f"Rendering {args.model} + {args.anim or 'built-in animation'}...")
     if args.depth_pass:
         reporter.say("  (with depth pass enabled)")
+    if args.normal_pass:
+        reporter.say("  (with normal-map pass enabled)")
+    if args.emissive_pass:
+        reporter.say("  (with emissive pass enabled)")
     out = renderer.render_and_export(
         char_fbx=args.model,
         anim_fbx=args.anim,
@@ -528,6 +546,9 @@ def build_parser():
     p_render.add_argument("--mesh-bodies", action="store_true", help="Generate capsule mesh bodies for each bone")
     # Phase 3: Depth rendering
     p_render.add_argument("--depth-pass", action="store_true", help="Enable Z-buffer depth pass (8-bit grayscale)")
+    # Phase 3: Multi-pass rendering (normal + emissive)
+    p_render.add_argument("--normal-pass", action="store_true", help="Enable normal-map pass (RGB PNG)")
+    p_render.add_argument("--emissive-pass", action="store_true", help="Enable emissive pass (emission-only RGB PNG)")
     # Phase 3: Palette variants
     p_render.add_argument("--variants", help="Comma-separated palette variant names (e.g. 'red,blue,green')")
     # SHADED world-state hooks

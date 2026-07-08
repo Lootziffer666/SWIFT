@@ -92,6 +92,33 @@ def export_depth_sheet(
     return out_path
 
 
+def _export_rgb_sheet(frame_paths, out_path, columns=None, padding=0):
+    """Pack RGB frame PNGs (normal / emissive maps) into a single sheet."""
+    if not frame_paths:
+        raise ValueError("No frames to export")
+
+    frames = [Image.open(p).convert("RGB") for p in frame_paths]
+    rects, (sheet_w, sheet_h), _ = _compute_frame_layout(frames[0].size, len(frames), columns, padding)
+    sheet = Image.new("RGB", (sheet_w, sheet_h), (0, 0, 0))  # Black background
+
+    for frame, (x, y, _fw, _fh) in zip(frames, rects):
+        sheet.paste(frame, (x, y))
+
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    sheet.save(out_path, "PNG")
+    return out_path
+
+
+def export_normal_sheet(normal_frame_paths, out_path, columns=None, padding=0):
+    """Pack normal-map frames (RGB) into a sprite sheet."""
+    return _export_rgb_sheet(normal_frame_paths, out_path, columns, padding)
+
+
+def export_emissive_sheet(emissive_frame_paths, out_path, columns=None, padding=0):
+    """Pack emissive frames (RGB) into a sprite sheet."""
+    return _export_rgb_sheet(emissive_frame_paths, out_path, columns, padding)
+
+
 def export_manifest(
     frame_paths: list[str],
     out_path: str,
@@ -102,6 +129,10 @@ def export_manifest(
     padding: int = 0,
     depth_image: Optional[str] = None,
     depth_frame_paths: Optional[list[str]] = None,
+    normal_image: Optional[str] = None,
+    normal_frame_paths: Optional[list[str]] = None,
+    emissive_image: Optional[str] = None,
+    emissive_frame_paths: Optional[list[str]] = None,
     world_states: Optional[Dict[str, WorldStateRef]] = None,
 ) -> str:
     """Write a SWIFT sprite-sheet manifest JSON (SpriteSheetManifest schema v1.4.0+)
@@ -153,6 +184,46 @@ def export_manifest(
             for fid, (x, y, w, h) in zip(frame_ids, depth_rects)
         }
         manifest["depthSourceImage"] = {"w": depth_w, "h": depth_h}
+
+    # Add normal-map information if provided
+    if normal_image:
+        manifest["normalImage"] = normal_image
+
+    if normal_frame_paths:
+        if len(normal_frame_paths) != len(frame_paths):
+            raise ValueError(
+                f"Normal frame count ({len(normal_frame_paths)}) "
+                f"must match color frame count ({len(frame_paths)})"
+            )
+        normal_frames = [Image.open(p).convert("RGB") for p in normal_frame_paths]
+        normal_rects, (normal_w, normal_h), _ = _compute_frame_layout(
+            normal_frames[0].size, len(normal_frames), columns, padding
+        )
+        manifest["normalFrameRects"] = {
+            fid: {"x": x, "y": y, "w": w, "h": h}
+            for fid, (x, y, w, h) in zip(frame_ids, normal_rects)
+        }
+        manifest["normalSourceImage"] = {"w": normal_w, "h": normal_h}
+
+    # Add emissive information if provided
+    if emissive_image:
+        manifest["emissiveImage"] = emissive_image
+
+    if emissive_frame_paths:
+        if len(emissive_frame_paths) != len(frame_paths):
+            raise ValueError(
+                f"Emissive frame count ({len(emissive_frame_paths)}) "
+                f"must match color frame count ({len(frame_paths)})"
+            )
+        emissive_frames = [Image.open(p).convert("RGB") for p in emissive_frame_paths]
+        emissive_rects, (emissive_w, emissive_h), _ = _compute_frame_layout(
+            emissive_frames[0].size, len(emissive_frames), columns, padding
+        )
+        manifest["emissiveFrameRects"] = {
+            fid: {"x": x, "y": y, "w": w, "h": h}
+            for fid, (x, y, w, h) in zip(frame_ids, emissive_rects)
+        }
+        manifest["emissiveSourceImage"] = {"w": emissive_w, "h": emissive_h}
 
     # Add SHADED world-state hooks (optional; additive field)
     if world_states:
@@ -284,9 +355,18 @@ def export_gif_from_images(
 
 
 class Exporter:
-    def __init__(self, frame_paths: list[str], fps: int = 12, depth_frame_paths: Optional[list[str]] = None):
+    def __init__(
+        self,
+        frame_paths: list[str],
+        fps: int = 12,
+        depth_frame_paths: Optional[list[str]] = None,
+        normal_frame_paths: Optional[list[str]] = None,
+        emissive_frame_paths: Optional[list[str]] = None,
+    ):
         self.frame_paths = frame_paths
         self.depth_frame_paths = depth_frame_paths or []
+        self.normal_frame_paths = normal_frame_paths or []
+        self.emissive_frame_paths = emissive_frame_paths or []
         self.fps = fps
 
     def to_sprite_sheet(self, out_path: str, columns: Optional[int] = None, padding: int = 0) -> str:
@@ -297,6 +377,18 @@ class Exporter:
         if not self.depth_frame_paths:
             raise ValueError("No depth frames available")
         return export_depth_sheet(self.depth_frame_paths, out_path, columns, padding)
+
+    def to_normal_sheet(self, out_path: str, columns: Optional[int] = None, padding: int = 0) -> str:
+        """Export normal-map frames as RGB sprite sheet."""
+        if not self.normal_frame_paths:
+            raise ValueError("No normal frames available")
+        return export_normal_sheet(self.normal_frame_paths, out_path, columns, padding)
+
+    def to_emissive_sheet(self, out_path: str, columns: Optional[int] = None, padding: int = 0) -> str:
+        """Export emissive frames as RGB sprite sheet."""
+        if not self.emissive_frame_paths:
+            raise ValueError("No emissive frames available")
+        return export_emissive_sheet(self.emissive_frame_paths, out_path, columns, padding)
 
     def to_gif(self, out_path: str, loop: int = 0) -> str:
         return export_gif(self.frame_paths, out_path, self.fps, loop)
@@ -310,9 +402,11 @@ class Exporter:
         animation_name: str = "animation",
         loop: bool = True,
         depth_image: Optional[str] = None,
+        normal_image: Optional[str] = None,
+        emissive_image: Optional[str] = None,
         world_states: Optional[Dict[str, WorldStateRef]] = None,
     ) -> str:
-        """Export manifest with optional depth frame and world-state metadata."""
+        """Export manifest with optional depth/normal/emissive + world-state metadata."""
         return export_manifest(
             self.frame_paths,
             out_path,
@@ -321,5 +415,9 @@ class Exporter:
             loop,
             depth_image=depth_image,
             depth_frame_paths=self.depth_frame_paths if self.depth_frame_paths else None,
+            normal_image=normal_image,
+            normal_frame_paths=self.normal_frame_paths if self.normal_frame_paths else None,
+            emissive_image=emissive_image,
+            emissive_frame_paths=self.emissive_frame_paths if self.emissive_frame_paths else None,
             world_states=world_states,
         )

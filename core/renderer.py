@@ -22,6 +22,8 @@ class StyleParams:
     palette_hint: Optional[str] = None     # e.g. "warm, limited 16 colors"
     exaggeration: float = 1.0              # 1.0 = normal, >1 = more squash/stretch
     enable_depth: bool = False             # Enable Z-buffer depth pass rendering
+    enable_normal: bool = False            # Enable normal-map pass rendering
+    enable_emissive: bool = False          # Enable emissive pass rendering
 
 
 @dataclass
@@ -59,6 +61,8 @@ class Renderer:
             camera_angle=s.camera_angle or self._config.default_camera_angle,
             blender_path=self._config.blender_path,
             enable_depth=s.enable_depth,
+            enable_normal=s.enable_normal,
+            enable_emissive=s.enable_emissive,
         )
         return self._bridge.render(job, progress_cb=progress_cb)
 
@@ -81,6 +85,8 @@ class Renderer:
             result.sprite_frames(),
             fps=s.fps or self._config.default_fps,
             depth_frame_paths=result.depth_frames() if s.enable_depth else None,
+            normal_frame_paths=result.normal_frames() if s.enable_normal else None,
+            emissive_frame_paths=result.emissive_frames() if s.enable_emissive else None,
         )
         out = export_path or os.path.join(result.frames_dir, "output")
 
@@ -92,13 +98,27 @@ class Renderer:
             if s.enable_depth and result.depth_frames():
                 depth_sheet_path = exporter.to_depth_sheet(out + "_depth.png")
 
-            # Export manifest with depth metadata
+            # Export normal-map sheet if available
+            normal_sheet_path = None
+            if s.enable_normal and result.normal_frames():
+                normal_sheet_path = exporter.to_normal_sheet(out + "_normal.png")
+
+            # Export emissive sheet if available
+            emissive_sheet_path = None
+            if s.enable_emissive and result.emissive_frames():
+                emissive_sheet_path = exporter.to_emissive_sheet(out + "_emissive.png")
+
+            # Export manifest with depth/normal/emissive metadata
             name = anim_name or os.path.splitext(os.path.basename(anim_fbx or char_fbx))[0]
             depth_image = os.path.basename(depth_sheet_path) if depth_sheet_path else None
+            normal_image = os.path.basename(normal_sheet_path) if normal_sheet_path else None
+            emissive_image = os.path.basename(emissive_sheet_path) if emissive_sheet_path else None
             exporter.to_manifest(
                 out + "_manifest.json",
                 animation_name=name,
                 depth_image=depth_image,
+                normal_image=normal_image,
+                emissive_image=emissive_image,
             )
             return sheet_path
         elif export_format == "gif":

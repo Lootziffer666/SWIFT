@@ -8,6 +8,7 @@ import sys
 import os
 import json
 import argparse
+import tempfile
 
 try:
     import bpy
@@ -15,6 +16,108 @@ try:
     BLENDER = True
 except ImportError:
     BLENDER = False
+
+
+# ── Fake Blender compositor node-tree stub ───────────────────────────────────
+# A tiny, dependency-free stand-in for a Blender scene.node_tree. Lets the pure
+# node-graph builders below be unit-tested WITHOUT `bpy` installed. Exposed via
+# make_fake_node_tree() so tests can assert node types/links.
+class _FakeSocket:
+    def __init__(self, node, name):
+        self.node = node
+        self.name = name
+        self.default_value = None
+
+
+class _FakeIONode:
+    def __init__(self, node):
+        self._node = node
+        self._sockets = {}
+
+    def _get(self, key):
+        if key not in self._sockets:
+            self._sockets[key] = _FakeSocket(self._node, key)
+        return self._sockets[key]
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            items = list(self._sockets.values())
+            while len(items) <= key:
+                self._get(len(items))
+                items = list(self._sockets.values())
+            return items[key]
+        return self._get(key)
+
+    def __setitem__(self, key, value):
+        self._get(key).default_value = value
+
+    def __iter__(self):
+        return iter(self._sockets.values())
+
+
+class _FakeFileSlot:
+    def __init__(self):
+        self.path = ""
+
+
+class _FakeFormat:
+    def __init__(self):
+        self.file_format = ""
+        self.color_mode = ""
+        self.color_depth = ""
+
+
+class _FakeNode:
+    def __init__(self, node_type):
+        self.type = node_type
+        self.name = None
+        self.inputs = _FakeIONode(self)
+        self.outputs = _FakeIONode(self)
+        self.operation = None
+        self.base_path = ""
+        self.file_slots = [_FakeFileSlot()]
+        self.format = _FakeFormat()
+
+
+class _FakeNodes:
+    def __init__(self):
+        self._list = []
+
+    def new(self, type):
+        node = _FakeNode(type)
+        node.name = f"{type}_{len(self._list)}"
+        self._list.append(node)
+        return node
+
+    def remove(self, node):
+        if node in self._list:
+            self._list.remove(node)
+
+    def __iter__(self):
+        return iter(self._list)
+
+    def __len__(self):
+        return len(self._list)
+
+
+class _FakeLinks:
+    def __init__(self):
+        self.links = []
+
+    def new(self, frm, to):
+        self.links.append((frm, to))
+        return (frm, to)
+
+
+class _FakeNodeTree:
+    def __init__(self):
+        self.nodes = _FakeNodes()
+        self.links = _FakeLinks()
+
+
+def make_fake_node_tree():
+    """Return a minimal fake Blender compositor node tree for unit tests."""
+    return _FakeNodeTree()
 
 
 def parse_args():
@@ -41,6 +144,10 @@ def parse_args():
                         help="Lock root bone XZ position (use with _RM animations)")
     parser.add_argument("--depth-pass", action="store_true",
                         help="Enable Z-buffer depth pass (outputs grayscale PNG)")
+    parser.add_argument("--normal-pass", action="store_true",
+                        help="Enable normal-map pass (outputs RGB PNG)")
+    parser.add_argument("--emissive-pass", action="store_true",
+                        help="Enable emissive pass (outputs emission-only RGB PNG)")
     return parser.parse_args(argv)
 
 
@@ -142,60 +249,149 @@ def apply_animation(char_objects, anim_path):
         armature.animation_data.action = action
 
 
-def setup_depth_compositor(scene):
-    """Configure Blender compositor for Z-depth output (0-255 grayscale)."""
-    # Enable compositor
-    scene.use_nodes = True
-    tree = scene.node_tree
-    links = tree.links
+# ── Pure node-graph builders (testable WITHOUT bpy) ─────────────────────────
+# Each builder takes a compositor node tree (real `scene.node_tree` or the fake
+# one from make_fake_node_tree) plus an output directory and a per-frame filename
+# pattern. It clears the tree, wires up the appropriate pass, and returns the
+# (tree, file_output_node). The File Output node writes to `<out_dir>/<filename>`
+# with `####` expanded to the scene frame number by Blender's animation render.
 
-    # Clear default nodes
-    for node in tree.nodes:
+DEPTH_SUFFIX = "depth"
+NORMAL_SUFFIX = "normal"
+EMISSIVE_SUFFIX = "emissive"
+
+
+def build_depth_compositor(tree, out_dir, filename=f"frame_####_{DEPTH_SUFFIX}.png"):
+    """Build a Z-depth → 8-bit grayscale PNG pass (0-255)."""
+    for node in list(tree.nodes):
         tree.nodes.remove(node)
 
-    # Create depth pass setup
-    # Input: Render Layers (has Z depth)
     render_layers = tree.nodes.new(type="CompositorNodeRLayers")
 
-    # Normalize Z to 0-1 range using Map Range node
-    # We'll use a simple approach: clamp depth to a reasonable range
-    # Assumes objects are within 0.1 to 100 units from camera
+    # Normalize Z to 0-1 (objects assumed within 0.1..100 units of camera)
     map_range = tree.nodes.new(type="CompositorNodeMapRange")
     map_range.inputs["From Min"].default_value = 0.1
     map_range.inputs["From Max"].default_value = 100.0
-    links.new(render_layers.outputs["Z"], map_range.inputs["Value"])
+    tree.links.new(render_layers.outputs["Z"], map_range.inputs["Value"])
 
-    # Scale to 0-255 (will be stored as 8-bit grayscale)
+    # Scale to 0-255 (8-bit grayscale)
     math_mult = tree.nodes.new(type="CompositorNodeMath")
     math_mult.operation = "MULTIPLY"
     math_mult.inputs[1].default_value = 255.0
-    links.new(map_range.outputs["Result"], math_mult.inputs[0])
+    tree.links.new(map_range.outputs["Result"], math_mult.inputs[0])
 
-    # Output to file
     file_output = tree.nodes.new(type="CompositorNodeFile")
-    file_output.base_path = ""  # Will be set per-frame
+    file_output.base_path = out_dir
     file_output.format.file_format = "PNG"
-    file_output.format.color_mode = "BW"  # Grayscale
-    file_output.format.color_depth = "8"  # 8-bit
-    links.new(math_mult.outputs[0], file_output.inputs[0])
+    file_output.format.color_mode = "BW"
+    file_output.format.color_depth = "8"
+    file_output.file_slots[0].path = filename
+    tree.links.new(math_mult.outputs[0], file_output.inputs[0])
 
     return tree, file_output
 
 
-def configure_render(scene, out_dir, width, height, fps, depth_pass=False):
+def build_normal_compositor(tree, out_dir, filename=f"frame_####_{NORMAL_SUFFIX}.png"):
+    """Build a tangent-space Normal pass → RGB PNG."""
+    for node in list(tree.nodes):
+        tree.nodes.remove(node)
+
+    render_layers = tree.nodes.new(type="CompositorNodeRLayers")
+
+    file_output = tree.nodes.new(type="CompositorNodeFile")
+    file_output.base_path = out_dir
+    file_output.format.file_format = "PNG"
+    file_output.format.color_mode = "RGB"
+    file_output.format.color_depth = "8"
+    file_output.file_slots[0].path = filename
+    tree.links.new(render_layers.outputs["Normal"], file_output.inputs[0])
+
+    return tree, file_output
+
+
+def build_emissive_compositor(tree, out_dir, filename=f"frame_####_{EMISSIVE_SUFFIX}.png"):
+    """Build an emission-only pass → RGB PNG.
+
+    The render output itself is taken from the standard Image output; callers
+    must first override materials with emission-only copies (see
+    _apply_emissive_override) so the rendered image IS the emissive map.
+    """
+    for node in list(tree.nodes):
+        tree.nodes.remove(node)
+
+    render_layers = tree.nodes.new(type="CompositorNodeRLayers")
+
+    file_output = tree.nodes.new(type="CompositorNodeFile")
+    file_output.base_path = out_dir
+    file_output.format.file_format = "PNG"
+    file_output.format.color_mode = "RGB"
+    file_output.format.color_depth = "8"
+    file_output.file_slots[0].path = filename
+    tree.links.new(render_layers.outputs["Image"], file_output.inputs[0])
+
+    return tree, file_output
+
+
+# ── Emissive material override (Blender-only) ───────────────────────────────
+
+def _extract_base_color(mat):
+    """Best-effort extraction of a material's diffuse/base color."""
+    if getattr(mat, "use_nodes", False):
+        for node in mat.node_tree.nodes:
+            if node.type == "BSDF_PRINCIPLED":
+                val = node.inputs["Base Color"].default_value
+                return tuple(val)
+    return tuple(getattr(mat, "diffuse_color", (1.0, 1.0, 1.0, 1.0)))
+
+
+def _apply_emissive_override(scene):
+    """Replace every mesh material with an emission-only copy of its base color."""
+    if not BLENDER:
+        return
+    scene.swift_original_materials = []
+    for obj in scene.objects:
+        if obj.type != "MESH":
+            continue
+        for slot in obj.material_slots:
+            orig = slot.material
+            if orig is None:
+                continue
+            scene.swift_original_materials.append((slot, orig))
+            new_mat = bpy.data.materials.new(name=f"SWIFT_EMISSIVE_{orig.name}")
+            new_mat.use_nodes = True
+            nodes = new_mat.node_tree.nodes
+            links = new_mat.node_tree.links
+            for n in list(nodes):
+                nodes.remove(n)
+            out_node = nodes.new(type="ShaderNodeOutputMaterial")
+            emit_node = nodes.new(type="ShaderNodeEmission")
+            emit_node.inputs["Color"].default_value = _extract_base_color(orig)
+            links.new(emit_node.outputs["Emission"], out_node.inputs["Surface"])
+            slot.material = new_mat
+
+
+def _restore_materials(scene):
+    """Restore original materials and dispose the temporary emissive copies."""
+    if not BLENDER:
+        return
+    for slot, orig in getattr(scene, "swift_original_materials", []):
+        slot.material = orig
+    scene.swift_original_materials = []
+    for mat in list(bpy.data.materials):
+        if mat.name.startswith("SWIFT_EMISSIVE_"):
+            bpy.data.materials.remove(mat)
+
+
+def configure_render(scene, out_dir, width, height, fps):
+    """Configure the color (RGBA) render output to <out_dir>/frame_*.png."""
     scene.render.resolution_x = width
     scene.render.resolution_y = height
     scene.render.fps = fps
 
-    if depth_pass:
-        # Use compositor for depth; disable normal render output
-        scene.render.image_settings.file_format = "OPEN_EXR"  # Compositor works best with EXR
-        scene.use_nodes = True
-    else:
-        # Normal RGBA render
-        scene.render.image_settings.file_format = "PNG"
-        scene.render.image_settings.color_mode = "RGBA"
-        scene.render.film_transparent = True
+    # Color RGBA render (transparent background)
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGBA"
+    scene.render.film_transparent = True
 
     scene.render.filepath = os.path.join(out_dir, "frame_")
     os.makedirs(out_dir, exist_ok=True)
@@ -207,26 +403,69 @@ def render_frames(scene, start, end):
     bpy.ops.render.render(animation=True)
 
 
-def render_depth_frames(scene, out_dir, start, end, width, height):
-    """Render depth pass using compositor, outputs grayscale PNG frames."""
-    # Setup compositor for depth
-    tree, file_output = setup_depth_compositor(scene)
+def _render_pass_frames(
+    scene,
+    out_dir,
+    start,
+    end,
+    build_fn,
+    filename,
+    prepare=None,
+    cleanup=None,
+):
+    """Render a single multi-pass output via the compositor File Output node.
 
-    # Manually iterate frames and render depth
-    for frame_num in range(start, end + 1):
-        scene.frame_set(frame_num)
+    The color render is redirected to a throwaway temp path so it does not
+    pollute <out_dir>; only the File Output node in `build_fn` writes the actual
+    pass frames into <out_dir>/<filename> (with `####` → frame number).
+    """
+    original_filepath = scene.render.filepath
+    original_use_nodes = scene.use_nodes
 
-        # Composite and save
-        bpy.ops.render.render(scene=scene.name)
+    if prepare:
+        prepare(scene)
+    scene.use_nodes = True
+    build_fn(scene.node_tree, out_dir, filename)
 
-        # Extract depth from compositor (manual approach, frame by frame)
-        # Blender will render via compositor nodes
-        frame_str = str(frame_num).zfill(4)
-        depth_out = os.path.join(out_dir, f"frame_{frame_str}_depth.png")
+    tmp_dir = tempfile.mkdtemp(prefix="swift_pass_")
+    scene.render.filepath = os.path.join(tmp_dir, "frame_")
+    scene.frame_start = start
+    scene.frame_end = end
+    try:
+        bpy.ops.render.render(animation=True)
+    finally:
+        scene.use_nodes = original_use_nodes
+        scene.render.filepath = original_filepath
+        if cleanup:
+            cleanup(scene)
 
-        # The compositor file output will handle PNG export
-        # We just ensure the naming convention is correct
-        print(f"Rendered depth frame {frame_num}: {depth_out}")
+    print(f"SWIFT: Rendered pass frames to {out_dir}")
+
+
+def render_depth_frames(scene, out_dir, start, end, width=None, height=None):
+    """Render depth pass (8-bit grayscale PNGs) into <out_dir>."""
+    _render_pass_frames(
+        scene, out_dir, start, end,
+        build_depth_compositor, f"frame_####_{DEPTH_SUFFIX}.png",
+    )
+
+
+def render_normal_frames(scene, out_dir, start, end, width=None, height=None):
+    """Render normal pass (RGB PNGs) into <out_dir>."""
+    _render_pass_frames(
+        scene, out_dir, start, end,
+        build_normal_compositor, f"frame_####_{NORMAL_SUFFIX}.png",
+    )
+
+
+def render_emissive_frames(scene, out_dir, start, end, width=None, height=None):
+    """Render emissive pass (RGB PNGs) into <out_dir>."""
+    _render_pass_frames(
+        scene, out_dir, start, end,
+        build_emissive_compositor, f"frame_####_{EMISSIVE_SUFFIX}.png",
+        prepare=_apply_emissive_override,
+        cleanup=_restore_materials,
+    )
 
 
 def write_metadata(out_dir, args, frame_count):
@@ -271,17 +510,31 @@ def main():
         # Use scene frame range set by imported animation
         end = scene.frame_end if scene.frame_end > start else start + 11
 
-    configure_render(scene, args.out, args.width, args.height, args.fps, args.depth_pass)
+    configure_render(scene, args.out, args.width, args.height, args.fps)
 
+    # Always render the color frames first.
+    render_frames(scene, start, end)
+    write_metadata(args.out, args, end - start + 1)
+    print(f"SWIFT: Rendered {end - start + 1} frames to {args.out}")
+
+    # Optional multi-pass outputs (each into its own subdir).
     if args.depth_pass:
         depth_out = os.path.join(args.out, "depth")
         os.makedirs(depth_out, exist_ok=True)
         render_depth_frames(scene, depth_out, start, end, args.width, args.height)
         print(f"SWIFT: Rendered {end - start + 1} depth frames to {depth_out}")
-    else:
-        render_frames(scene, start, end)
-        write_metadata(args.out, args, end - start + 1)
-        print(f"SWIFT: Rendered {end - start + 1} frames to {args.out}")
+
+    if args.normal_pass:
+        normal_out = os.path.join(args.out, "normal")
+        os.makedirs(normal_out, exist_ok=True)
+        render_normal_frames(scene, normal_out, start, end, args.width, args.height)
+        print(f"SWIFT: Rendered {end - start + 1} normal frames to {normal_out}")
+
+    if args.emissive_pass:
+        emissive_out = os.path.join(args.out, "emissive")
+        os.makedirs(emissive_out, exist_ok=True)
+        render_emissive_frames(scene, emissive_out, start, end, args.width, args.height)
+        print(f"SWIFT: Rendered {end - start + 1} emissive frames to {emissive_out}")
 
 
 if __name__ == "__main__":

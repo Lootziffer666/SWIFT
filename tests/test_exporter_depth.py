@@ -198,3 +198,51 @@ class TestDepthManifestIntegration:
             assert len(manifest.depth_frame_rects) == len(color_frames)
             assert manifest.depth_source_w == 128
             assert manifest.depth_source_h == 32
+
+
+class TestDepthRoundTripWithRealFrames:
+    """Non-Blender: pack real fake depth PNG frames and round-trip the manifest."""
+
+    def _make_frames(self, tmpdir, suffix, mode, values):
+        paths = []
+        for i, v in enumerate(values):
+            img = Image.new(mode, (32, 32), v)
+            p = os.path.join(tmpdir, f"frame_{i:04d}_{suffix}.png")
+            img.save(p, "PNG")
+            paths.append(p)
+        return paths
+
+    def test_depth_sheet_and_manifest_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            depth_paths = self._make_frames(tmpdir, "depth", "L", [0, 60, 120, 180])
+            color_paths = self._make_frames(tmpdir, "color", "RGBA",
+                                            [(255, 0, 0, 255), (0, 255, 0, 255),
+                                             (0, 0, 255, 255), (255, 255, 0, 255)])
+
+            exporter = Exporter(color_paths, depth_frame_paths=depth_paths)
+            depth_sheet = os.path.join(tmpdir, "out_depth.png")
+            manifest_path = os.path.join(tmpdir, "out_manifest.json")
+
+            # A depth sheet is actually produced
+            result = exporter.to_depth_sheet(depth_sheet)
+            assert os.path.isfile(result)
+            sheet = Image.open(result)
+            assert sheet.mode == "L"
+            assert sheet.size == (128, 32)
+
+            exporter.to_manifest(manifest_path, depth_image="out_depth.png")
+
+            # Round-trips through SpriteSheetManifest
+            manifest = SpriteSheetManifest.from_file(manifest_path)
+            assert manifest.depth_image == "out_depth.png"
+            assert "depthImage" in _raw(manifest_path)
+            assert manifest.depth_frame_rects
+            assert len(manifest.depth_frame_rects) == 4
+            assert manifest.depth_source_w == 128
+            assert manifest.depth_source_h == 32
+
+
+def _raw(path):
+    import json
+    with open(path) as f:
+        return json.load(f)
