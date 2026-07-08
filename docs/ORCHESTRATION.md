@@ -215,9 +215,10 @@ python main.py analyze <sheet> [--api-key KEY]
 | `sheet` (positional) | **yes** | — | Path to reference sheet image. |
 | `--api-key` | no | `$ANTHROPIC_API_KEY` | Anthropic API key. |
 
-**Failure modes:** `sys.exit(1)` if no API key is available (env or flag). On success
-prints extracted `Style parameters` (size, fps, camera, pixel size, palette hint,
-exaggeration) to stdout and exits `0`.
+**Failure modes:** `sys.exit(2)` (`InputMissingError`) if no API key is available (env
+or flag); this is a *missing input* condition, not a generic error. On success prints
+extracted `Style parameters` (size, fps, camera, pixel size, palette hint, exaggeration)
+to stdout and exits `0`.
 
 **Output:** this command writes **no artifact file**. Results are printed as text to
 stdout. ANVIL can parse the printed lines, or (recommended) feed the same sheet
