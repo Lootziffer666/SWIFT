@@ -134,7 +134,10 @@ def cmd_render(args, reporter: Reporter):
     if not os.path.isfile(args.model):
         raise InputMissingError(f"Model FBX not found: {args.model}")
 
-    # Phase 3: Handle procedural skeleton generation
+    # Phase 3: Handle procedural skeleton generation.
+    # IMPORTANT: never overwrite the user's input model. Generate the rig to a
+    # derived path and render THAT generated rig instead.
+    render_model = args.model
     if args.skeleton_generator:
         from core.procedural.skeleton_generator import SkeletonParams, SkeletonGenerator
         reporter.say(f"Generating procedural skeleton (height={args.height_cm}cm, weight={args.weight_kg}kg)...")
@@ -145,10 +148,18 @@ def cmd_render(args, reporter: Reporter):
             with_mesh_bodies=args.mesh_bodies,
         )
         generator = SkeletonGenerator()
-        result = generator.generate(params, export_fbx=args.model)
+        # Resolve a non-destructive output path for the generated rig.
+        if getattr(args, "skeleton_output", None):
+            skeleton_fbx = args.skeleton_output
+        else:
+            model_dir = os.path.dirname(os.path.abspath(args.model))
+            model_stem = os.path.splitext(os.path.basename(args.model))[0]
+            skeleton_fbx = os.path.join(model_dir, f"{model_stem}_procedural.fbx")
+        result = generator.generate(params, export_fbx=skeleton_fbx)
         reporter.say(f"  Skeleton: {result['metadata']['total_joints']} joints")
         if result['fbx_path']:
-            reporter.say(f"  FBX exported to: {result['fbx_path']}")
+            reporter.say(f"  Rig generated (original model preserved): {result['fbx_path']}")
+            render_model = result['fbx_path']
 
     config = RendererConfig(blender_path=args.blender)
     renderer = Renderer(config)
@@ -169,7 +180,7 @@ def cmd_render(args, reporter: Reporter):
         enable_emissive=args.emissive_pass,
     )
 
-    reporter.say(f"Rendering {args.model} + {args.anim or 'built-in animation'}...")
+    reporter.say(f"Rendering {render_model} + {args.anim or 'built-in animation'}...")
     if args.depth_pass:
         reporter.say("  (with depth pass enabled)")
     if args.normal_pass:
@@ -177,7 +188,7 @@ def cmd_render(args, reporter: Reporter):
     if args.emissive_pass:
         reporter.say("  (with emissive pass enabled)")
     out = renderer.render_and_export(
-        char_fbx=args.model,
+        char_fbx=render_model,
         anim_fbx=args.anim,
         export_path=args.output,
         export_format=args.format,
@@ -544,6 +555,7 @@ def build_parser():
     p_render.add_argument("--weight-kg", type=float, default=70.0, help="Character weight in kg")
     p_render.add_argument("--with-ik", action="store_true", help="Apply 2-bone IK chains to limbs")
     p_render.add_argument("--mesh-bodies", action="store_true", help="Generate capsule mesh bodies for each bone")
+    p_render.add_argument("--skeleton-output", help="Output FBX path for the generated rig (default: <model>_procedural.fbx, never overwrites input)")
     # Phase 3: Depth rendering
     p_render.add_argument("--depth-pass", action="store_true", help="Enable Z-buffer depth pass (8-bit grayscale)")
     # Phase 3: Multi-pass rendering (normal + emissive)
