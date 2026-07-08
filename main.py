@@ -115,40 +115,50 @@ def cmd_render(args):
                     json.dump(manifest, f, indent=2)
                 print(f"  ✓ Manifest updated with {len(variant_data)} variants")
 
-    # SHADED world-state hooks: generate world-state palette variants
+    # SHADED world-state hooks: generate REAL per-state actor variants
     if args.world_states:
         print(f"\nGenerating SHADED world-state variants: {args.world_states}")
-        from core.procedural.palette_swap import (
-            get_world_state_palette,
-            remap_world_state,
-        )
+        from core.procedural.world_states import apply_world_state, list_world_states
         from core.sprite_sheet import WorldStateRef
 
         world_states_list = [v.strip() for v in args.world_states.split(",") if v.strip()]
+        available = set(list_world_states())
 
         base_sheet_path = out if out.endswith('.png') else out + '.png'
         if not os.path.exists(base_sheet_path):
             print(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
         else:
-            base_sheet = Image.open(base_sheet_path)
+            base_sheet = Image.open(base_sheet_path).convert("RGBA")
             ws_manifest = {}
 
-            for state_name in world_states_list:
-                try:
-                    palette = get_world_state_palette(state_name)
-                except KeyError:
+            for entry in world_states_list:
+                # Parse "name" or "name=0.7"
+                if "=" in entry:
+                    state_name, intensity_str = entry.split("=", 1)
+                    state_name = state_name.strip()
+                    try:
+                        intensity = float(intensity_str.strip())
+                    except ValueError:
+                        intensity = 0.5
+                else:
+                    state_name = entry
+                    intensity = 0.5
+                intensity = max(0.0, min(1.0, intensity))
+
+                if state_name not in available:
                     print(f"  ⚠️ Unknown world state: {state_name} (skip)")
                     continue
 
-                variant_sheet = remap_world_state(base_sheet, palette, intensity=1.0)
+                variant_sheet = apply_world_state(base_sheet, state_name, intensity)
                 variant_path = out.replace('.png', f'_{state_name}.png')
                 variant_sheet.save(variant_path, 'PNG')
                 ws_manifest[state_name] = WorldStateRef(
                     name=state_name,
-                    palette=state_name,
-                    intensity=(0.0, 1.0),
+                    transform=state_name,
+                    intensity=intensity,
+                    variant_path=os.path.basename(variant_path),
                 )
-                print(f"  ✓ {state_name}: {variant_path}")
+                print(f"  ✓ {state_name} (intensity={intensity:.2f}): {variant_path}")
 
             manifest_path = out.replace('.png', '_manifest.json')
             if os.path.exists(manifest_path) and ws_manifest:
