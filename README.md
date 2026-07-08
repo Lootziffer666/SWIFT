@@ -11,8 +11,8 @@ python main.py render \
   --model character.fbx \
   --anim idle \
   --format sprite_sheet \
-  --export-manifest output_manifest.json
-# Output: output.png (RGB), output_manifest.json (v1.4.0)
+  --output output
+# Output: output.png (RGBA), output_manifest.json (v1.4.0)
 ```
 
 Das erzeugte Manifest kann sofort in SHADED geladen werden – keine weitere Konfiguration nötig.
@@ -40,41 +40,98 @@ pip install -r requirements.txt
 apt-get install -y blender  # oder brew install blender (macOS)
 ```
 
-## CLI-Verwendung
+## Commands
 
-### Sprite-Sheet Export mit Manifest
+SWIFT bietet ein CLI (`python main.py <subcommand>` bzw. den `swift`-Launcher) sowie
+eine PySide6-GUI. Alle Unterbefehle akzeptieren `--json` / `--json-summary` für die
+maschinenlesbare ANVIL-Anbindung (Vertrag in `docs/ORCHESTRATION.md`).
+
+### GUI (Render / Analyze / Mocap / Video2Sprite / SpriteSheet)
+
+```bash
+python -m gui.app     # startet die PySide6-GUI
+swift gui             # Äquivalent über den CLI-Launcher
+```
+
+Die GUI (`gui/app.py`) kapselt die CLI-Unterbefehle in Tabs: **Render**, **Analyze**,
+**Mocap**, **Video2Sprite**, **SpriteSheet**. Der Render-Tab stellt u. a. ein
+**World-states**-Textfeld bereit (Platzhalter `dust,aging=0.7`), über das die
+SHADED-Weltzustands-Varianten direkt konfiguriert werden – die Varianten entstehen als
+deterministische Pillow/NumPy-Transformationen, also ohne Blender-Laufzeit.
+
+### Maschinenlesbares CLI (`--json-summary`)
+
+Jeder Unterbefehl gibt mit `--json` (Alias `--json-summary`) bei Erfolg **ein einziges
+JSON-Objekt nach STDOUT** aus; aller Fortschritt/alle Diagnose landen auf STDERR. Bei
+Fehler wird `{"status":"error","error":<msg>}` nach STDERR geschrieben und der Prozess
+endet nicht-null.
+
+```bash
+python main.py render --model hero.fbx --world-states dust,aging --json
+#   stdout: {"status":"success","command":"render","artifacts":[...],"manifest_path":"...","sheet_path":"...","depth_path":null,"world_states":["dust","aging"],"fps":12,"frame_count":24,"animation_names":["walk"],"mapping_version":"1.4.0"}
+#   stderr: (Fortschritt/Diagnose)
+```
+
+**Exit-Codes (SWIFT ↔ ANVIL Vertrag, siehe `docs/ORCHESTRATION.md` §1):**
+
+| Code | Bedeutung |
+|------|-----------|
+| `0` | Erfolg (bzw. nur Hilfe ohne Subcommand). |
+| `1` | Allgemeiner Fehler (Render-/Tracking-Fehler, unbehandelte Ausnahme). |
+| `2` | Fehlende Eingabe (Datei/Wert): Modell-FBX, Video, Sheet, Manifest, `--anim`/`--frame` oder API-Key fehlt. |
+| `3` | Externes Werkzeug fehlt: Blender (`render`) bzw. PySide6 (`gui`). |
+
+### End-to-End-Demo (ohne Blender)
+
+`scripts/demo_actor_pipeline.py` führt den kompletten SHADED-ready Actor-Pfad CI-tauglich
+aus – ohne Blender und ohne SHADED-Laufzeit:
+
+```bash
+python scripts/demo_actor_pipeline.py                   # 6 Frames, idle, dust/aging/heat/soot
+python scripts/demo_actor_pipeline.py --depth           # zusätzlich Depth-Sheet
+python scripts/demo_actor_pipeline.py --out artifacts/actor_demo
+```
+
+Es erzeugt ein addActor-kompatibles Basis-Sheet (PNG) + Manifest (JSON v1.4.0) sowie pro
+Weltzustand eine Varianten-PNG (`<anim>_<state>.png`) und validiert abschließend
+addActor-Kompatibilität + Manifest-Round-Trip. Details in `docs/ECOSYSTEM.md`.
+
+### Unterbefehle (Kurzreferenz)
+
+| Subcommand | Zweck | Wichtigste Flags |
+|------------|-------|------------------|
+| `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator` |
+| `analyze` | Referenz-Sheet → StyleParams (Claude Vision) | `sheet` (pos), `--api-key` |
+| `mocap` | Video → BVH | `video` (pos), `--output` |
+| `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes` |
+| `spritesheet` | Sheet + Manifest inspizieren/re-exportieren | `action` (list/export/extract), `image` (pos), `--manifest`, `--anim`, `--frame` |
+| `gui` | PySide6-GUI starten | – |
+
+Beispiel (Render mit Weltzuständen + Manifest):
 
 ```bash
 python main.py render \
-  --model path/to/character.fbx \
+  --model character.fbx \
   --anim walk \
-  --format sprite_sheet \
-  --output output_dir/ \
-  --export-manifest \
-  --anim-name "walk"
+  --output out/hero \
+  --world-states "dust,aging" \
+  --format sprite_sheet
+# Erzeugt: out/hero.png, out/hero_manifest.json, out/hero_dust.png, out/hero_aging.png
 ```
 
-**Parameter:**
-- `--model`: FBX-Charakter-Datei
-- `--anim`: Blender-Animations-Name (aus FBX extrahiert)
-- `--format`: `sprite_sheet` (PNG + JSON Manifest)
-- `--output`: Ausgabeverzeichnis
-- `--export-manifest`: Manifest JSON automatisch erzeugen
-- `--anim-name`: Name für den Animation-Key im Manifest (Default: Basis-Filename)
+Die vollständige CLI-/Orchestrierungsvereinbarung (alle Flags, Artefakte, Manifest-Schema
+inkl. `worldStates`) ist in `docs/ORCHESTRATION.md` dokumentiert; SWIFT's Rolle im
+Ökosystem in `docs/ECOSYSTEM.md`.
 
-**Output:**
-- `output.png`: RGB Sprite-Sheet (RGBA mit Transparenz)
-- `output_manifest.json`: v1.4.0 Manifest mit Frame-Rects und Animationen
-
-### Manifest-Schema (v1.4.0)
+## Manifest-Schema (v1.4.0)
 
 ```json
 {
   "mappingVersion": "1.4.0",
   "sourceImage": { "w": 512, "h": 256 },
   "frameRects": {
-    "F01": [0, 0, 128, 256],
-    "F02": [128, 0, 128, 256]
+    "F01": {"x": 0, "y": 0, "w": 128, "h": 256},
+    "F02": {"x": 128, "y": 0, "w": 128, "h": 256}
   },
   "frames": [
     { "id": "F01", "key": "walk_01" },
@@ -93,7 +150,7 @@ python main.py render \
 **Felder:**
 - `mappingVersion`: Schema-Version (1.4.0 = mit Depth-Map Support)
 - `sourceImage`: Sprite-Sheet Dimensionen (w, h)
-- `frameRects`: Koordinaten jedes Frames im Sheet [x, y, w, h]
+- `frameRects`: Koordinaten jedes Frames im Sheet als Objekt `{"x","y","w","h"}` (nicht als Array)
 - `frames`: Frame-Metadaten mit eindeutigem ID + semantischem Key
 - `animations`: Benannte Animations-Sequenzen mit FPS und Loop-Flag
 
@@ -104,11 +161,16 @@ python main.py render \
   "depthImage": "output_depth.png",
   "depthSourceImage": { "w": 512, "h": 256 },
   "depthFrameRects": {
-    "F01": [0, 0, 128, 256],
-    "F02": [128, 0, 128, 256]
+    "F01": {"x": 0, "y": 0, "w": 128, "h": 256},
+    "F02": {"x": 128, "y": 0, "w": 128, "h": 256}
   }
 }
 ```
+
+> **Schema ist autoritativ in `docs/ORCHESTRATION.md` (§4):** dort sind die optionalen
+> Felder `appliesTo`, `variants` und `worldStates` (SHADED-Weltzustands-Hooks aus
+> `--world-states`) sowie die exakte Rect-Kodierung (`{"x","y","w","h"}`, nicht Array)
+> vollständig dokumentiert. Die Tabelle oben ist eine Kurzfassung.
 
 ## SWIFT → SHADED Integration
 
