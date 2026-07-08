@@ -142,7 +142,8 @@ class Palette:
         """Add a single color mapping."""
         self.color_map[src_rgb] = dst_rgb
 
-    def from_hex_map(hex_map: Dict[str, str]) -> "Palette":
+    @classmethod
+    def from_hex_map(cls, hex_map: Dict[str, str]) -> "Palette":
         """Create palette from hex color map (e.g. {"#FF0000": "#00FF00"})."""
         palette = Palette(name="unnamed")
         for src_hex, dst_hex in hex_map.items():

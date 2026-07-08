@@ -57,7 +57,9 @@ Die GUI (`gui/app.py`) kapselt die CLI-Unterbefehle in Tabs: **Render**, **Analy
 **Mocap**, **Video2Sprite**, **SpriteSheet**. Der Render-Tab stellt u. a. ein
 **World-states**-Textfeld bereit (Platzhalter `dust,aging=0.7`), über das die
 SHADED-Weltzustands-Varianten direkt konfiguriert werden – die Varianten entstehen als
-deterministische Pillow/NumPy-Transformationen, also ohne Blender-Laufzeit.
+deterministische Pillow/NumPy-Transformationen, also ohne Blender-Laufzeit. Ebenso gibt
+es das Textfeld **Palette variants** (Platzhalter `red,green`) für Runtime-Farbvarianten
+(via `--variants`, siehe Abschnitt *Palette-Swapping*).
 
 ### Maschinenlesbares CLI (`--json-summary`)
 
@@ -284,6 +286,37 @@ python main.py render \
 
 Die IK-Ketten- und Mesh-Body-Geometrie werden rein (ohne Blender) berechnet und
 sind per Unit-Test verifizierbar (`tests/test_skeleton_procedural_math.py`).
+
+### Palette-Swapping (Runtime-Farbvarianten)
+
+Farbsvarianten eines bereits gerenderten Sheets entstehen **rein zur Laufzeit**
+(Pillow-LUT-Pass), also **ohne Blender und ohne Neurender**. Das ist ideal für
+schnelle Personalisierung (z. B. Team-Farben, Skins).
+
+Zwei Syntaxen für `--variants` (Komma-getrennt):
+
+- **Benannte Presets** — `red,green,purple,gold` (vordefinierte Rampe auf das
+  kanonische „Team-Blau" des Renderers):
+  ```bash
+  python main.py render --model hero.fbx --output out/hero --variants "red,green"
+  # Erzeugt: out/hero_red.png, out/hero_green.png  +  manifest['variants']
+  ```
+- **Eigene Hex-Maps** — `name=#Src:Dst` definiert beliebige Quell→Ziel-Tausche
+  zur Laufzeit (kein Re-Render nötig). Mehrere Paare mit `;` trennen:
+  ```bash
+  python main.py render --model hero.fbx --output out/hero \
+    --variants "team_red=#4169E1:#FF6347"
+  # Erzeugt: out/hero_team_red.png  (Quell-Farbe #4169E1 -> #FF6347)
+  python main.py render --model hero.fbx --output out/hero \
+    --variants "x=#AABBCC:#112233;#DDEEFF:#445566"
+  ```
+
+Pro Variante wird `<base>_<name>.png` geschrieben und das Manifest um
+`"variants": [{"name": ..., "path": ...}, ...]` ergänzt. Die PNGs sind
+deterministisch (timestamp-frei), und die `variants`-Liste round-trip-t über
+`SpriteSheetManifest`. Der GUI-Render-Tab stellt dafür das Textfeld
+**Palette variants** (Platzhalter `red,green`) bereit.
+
 
 ## Abhängigkeiten
 
