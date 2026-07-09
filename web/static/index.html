@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SWIFT · Web Demo</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2a313c; --txt:#e6edf3; --muted:#8b97a7; --accent:#e65a3c; --accent2:#5aa0e6; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.5px; }
+  header span { color:var(--muted); font-size:12px; }
+  .wrap { display:grid; grid-template-columns:320px 1fr; gap:16px; padding:16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:0 0 10px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  input[type=file], input[type=number], select { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:6px; padding:7px; font-size:13px; }
+  button { cursor:pointer; border:none; border-radius:6px; padding:8px 12px; font-weight:600; font-size:13px; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-secondary { background:var(--panel2); color:var(--txt); border:1px solid var(--line); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .stage { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  canvas { background:repeating-conic-gradient(#1a1f27 0% 25%, #14181f 0% 50%) 50% / 24px 24px; border:1px solid var(--line); border-radius:8px; image-rendering:pixelated; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .meta { font-size:12px; color:var(--muted); }
+  pre { background:#0b0e13; border:1px solid var(--line); border-radius:8px; padding:12px; max-height:240px; overflow:auto; font-size:11px; color:#9fb0c3; }
+  .hint { font-size:11px; color:var(--muted); margin-top:6px; }
+  .err { color:#ff7b72; font-size:12px; min-height:16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SWIFT</h1><span>Sprite-Werkzeug · Web-Demo (FBX → Sprite-Sheet via Blender)</span>
+</header>
+<div class="wrap">
+  <div>
+    <div class="panel">
+      <h2>1 · Demo laden</h2>
+      <button class="btn-primary" id="btnSample">Beispiel-Sprite laden</button>
+      <div class="hint">Generiert ein animiertes Beispiel-Blatt (Manifest v1.4.0).</div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>2 · Eigenes Blatt hochladen</h2>
+      <label>Sprite-Sheet (PNG)</label>
+      <input type="file" id="upSheet" accept="image/png" />
+      <label>Manifest (JSON)</label>
+      <input type="file" id="upManifest" accept=".json" />
+      <div class="row" style="margin-top:8px"><button class="btn-secondary" id="btnUpload">Abspielen</button></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>3 · Live-Render (Blender)</h2>
+      <label>Character FBX</label>
+      <input type="file" id="rdModel" accept=".fbx" />
+      <label>Animation FBX (optional)</label>
+      <input type="file" id="rdAnim" accept=".fbx" />
+      <div class="row">
+        <div style="flex:1;min-width:90px"><label>Breite</label><input type="number" id="rdW" value="64" /></div>
+        <div style="flex:1;min-width:90px"><label>Höhe</label><input type="number" id="rdH" value="64" /></div>
+        <div style="flex:1;min-width:90px"><label>FPS</label><input type="number" id="rdFps" value="12" /></div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:120px"><label>Pixel-Größe</label><input type="number" id="rdPix" value="4" /></div>
+        <div style="flex:1;min-width:120px"><label>Kamera</label>
+          <select id="rdCam"><option>front</option><option>side</option><option>three-quarter</option></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px"><button class="btn-primary" id="btnRender">Rendern</button></div>
+      <div class="hint">Benötigt Blender im Container. Ohne Blender erscheint ein Hinweis.</div>
+    </div>
+  </div>
+  <div class="panel stage">
+    <div class="controls">
+      <button class="btn-secondary" id="btnPlay">▶ Play</button>
+      <label style="margin:0">Animation</label>
+      <select id="selAnim"></select>
+      <span class="meta" id="frameInfo"></span>
+    </div>
+    <canvas id="cv" width="288" height="288"></canvas>
+    <div class="err" id="err"></div>
+    <details style="width:100%">
+      <summary class="meta">Manifest anzeigen</summary>
+      <pre id="manifestView">—</pre>
+    </details>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let sheetImg = null, manifest = null, anim = null, frames = [], idx = 0, timer = null, playing = false;
+
+function setError(m){ document.getElementById('err').textContent = m || ''; }
+
+function loadDemo(sheetUrl, man){
+  manifest = man; sheetImg = new Image();
+  sheetImg.onload = () => { buildAnimSelect(); play(); };
+  sheetImg.onerror = () => setError('Sprite-Sheet konnte nicht geladen werden.');
+  sheetImg.src = sheetUrl;
+  document.getElementById('manifestView').textContent = JSON.stringify(man, null, 2);
+}
+
+function buildAnimSelect(){
+  const sel = document.getElementById('selAnim');
+  sel.innerHTML = '';
+  const anims = manifest.animations || {};
+  Object.keys(anims).forEach(name => {
+    const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+  });
+  if(sel.options.length) sel.selectedIndex = 0;
+  selectAnim();
+}
+
+function selectAnim(){
+  const name = document.getElementById('selAnim').value;
+  anim = manifest.animations[name];
+  frames = anim.frames || [];
+  idx = 0; drawFrame();
+}
+
+function drawFrame(){
+  if(!sheetImg || !anim || !frames.length) return;
+  const fid = frames[idx];
+  const r = manifest.frameRects[fid];
+  if(!r){ return; }
+  const [sx, sy, sw, sh] = r;
+  const scale = Math.max(1, Math.floor(Math.min(cv.width / sw, cv.height / sh)));
+  cv.width = sw * scale; cv.height = sh * scale;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sheetImg, sx, sy, sw, sh, 0, 0, sw * scale, sh * scale);
+  document.getElementById('frameInfo').textContent = `Frame ${idx+1}/${frames.length} · ${anim.fps} fps`;
+}
+
+function play(){
+  if(playing) return;
+  playing = true; document.getElementById('btnPlay').textContent = '⏸ Pause';
+  const fps = (anim && anim.fps) ? anim.fps : 12;
+  timer = setInterval(() => {
+    idx = (idx + 1) % frames.length; drawFrame();
+  }, 1000 / fps);
+}
+function pause(){
+  playing = false; clearInterval(timer); document.getElementById('btnPlay').textContent = '▶ Play';
+}
+function toggle(){ playing ? pause() : play(); }
+
+document.getElementById('btnSample').onclick = async () => {
+  setError(''); const r = await fetch('/api/sample').then(x=>x.json()); loadDemo(r.sheet, r.manifest);
+};
+document.getElementById('btnPlay').onclick = toggle;
+document.getElementById('selAnim').onchange = selectAnim;
+
+document.getElementById('btnUpload').onclick = async () => {
+  setError('');
+  const s = document.getElementById('upSheet').files[0];
+  const m = document.getElementById('upManifest').files[0];
+  if(!s || !m){ setError('Bitte Sheet und Manifest hochladen.'); return; }
+  const fd = new FormData(); fd.append('sheet', s); fd.append('manifest', m);
+  const r = await fetch('/api/upload', {method:'POST', body:fd}).then(x=>x.json());
+  if(r.error){ setError(r.error); return; }
+  loadDemo(r.sheet, r.manifest);
+};
+
+document.getElementById('btnRender').onclick = async () => {
+  setError('');
+  const model = document.getElementById('rdModel').files[0];
+  if(!model){ setError('Bitte ein Character-FBX hochladen.'); return; }
+  const fd = new FormData();
+  fd.append('fbx', model);
+  const animFile = document.getElementById('rdAnim').files[0];
+  if(animFile) fd.append('anim', animFile);
+  fd.append('width', document.getElementById('rdW').value);
+  fd.append('height', document.getElementById('rdH').value);
+  fd.append('fps', document.getElementById('rdFps').value);
+  fd.append('pixel_size', document.getElementById('rdPix').value);
+  fd.append('camera', document.getElementById('rdCam').value);
+  document.getElementById('btnRender').textContent = 'Rendere…';
+  const r = await fetch('/api/render', {method:'POST', body:fd}).then(x=>x.json());
+  document.getElementById('btnRender').textContent = 'Rendern';
+  if(r.error){ setError(r.error + (r.detail ? '\n'+r.detail : '')); return; }
+  loadDemo(r.sheet, r.manifest);
+};
+</script>
+</body>
+</html>

@@ -10,3 +10,5 @@ build/
 /output/
 /tmp_renders/
 artifacts/
+web/data/
+web/__pycache__/
