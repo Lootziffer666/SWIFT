@@ -160,7 +160,11 @@ class TestNonDestructiveExport:
                 SkeletonParams(height_cm=180, weight_kg=80, with_ik=True, with_mesh_bodies=True),
                 export_fbx=derived,
             )
-            assert result["fbx_path"] == derived
-            assert os.path.exists(derived)
+            # Without bpy no FBX is produced (no placeholder either), but any
+            # artifacts must stay next to the requested path: the metadata JSON
+            # derives from `derived`, and the sibling input is never touched.
+            assert result["fbx_path"] is None
+            assert not os.path.exists(derived)
+            assert os.path.exists(derived.replace(".fbx", "_skeleton.json"))
             with open(original, "rb") as f:
                 assert f.read() == b"ORIGINAL MODEL DATA"
