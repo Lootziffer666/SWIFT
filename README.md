@@ -107,6 +107,7 @@ addActor-Kompatibilität + Manifest-Round-Trip. Details in `docs/ECOSYSTEM.md`.
 | `mocap` | Video → BVH | `video` (pos), `--output` |
 | `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes` |
 | `spritesheet` | Sheet + Manifest inspizieren/re-exportieren | `action` (list/export/extract), `image` (pos), `--manifest`, `--anim`, `--frame` |
+| `anims` | FBX/BVH-Animationsbibliothek scannen & listen (Quelle, Root-Motion) | `paths` (pos), `--query`, `--source`, `--no-recursive` |
 | `gui` | PySide6-GUI starten | – |
 
 Beispiel (Render mit Weltzuständen + Manifest):
@@ -181,9 +182,14 @@ Das erzeugte Manifest + Sprite-Sheet können direkt in SHADED geladen werden:
 ```html
 <!-- index.html / Browser-Test -->
 <script>
-const actor = await SHADED.addActor({
-  image: 'output.png',           // Sprite-Sheet
-  manifest: 'output_manifest.json', // Auto-erzeugtes Manifest
+// addActor nimmt das Manifest als OBJEKT (oder JSON-Text) entgegen – nicht als
+// Datei-URL. Und: das Manifest-Feld "depthImage" wird von addActor NICHT
+// automatisch geladen; die Depth-Map wird als eigene Option übergeben.
+const manifest = await fetch('output_manifest.json').then(r => r.json());
+const actor = SHADED.addActor({
+  image: 'output.png',           // Sprite-Sheet (URL oder HTMLImageElement)
+  manifest,                      // Manifest-Objekt (v1.4.0)
+  depthImage: manifest.depthImage || undefined, // optional: Depth-Sheet explizit
   x: 0.5, y: 0.5,               // Szenen-Position
   scale: 1.0,                    // Skalierung
   anim: 'walk',                  // Animation-Name aus Manifest
@@ -290,13 +296,24 @@ python main.py render \
 
 ### Procedurale Skelette (Parametrische Charakter-Generierung)
 
-Über `--skeleton-generator` wird kein FBX geladen, sondern ein parametrisches
-Humanoid-Skelett (Armature + Knochen) erzeugt und **dieses generierte Rig**
-gerendert. Das ursprüngliche Eingabe-Modell (`--model`) wird **nie
-überschrieben**.
+Über `--skeleton-generator` wird ein parametrisches Humanoid-Skelett
+(Armature + Knochen) erzeugt. Das ursprüngliche Eingabe-Modell (`--model`)
+wird **nie überschrieben**.
+
+**Ehrlicher Status:** Der FBX-Export des Rigs benötigt `bpy` und funktioniert
+daher nur, wenn der Code INNERHALB von Blenders Python läuft — im normalen
+CLI-Prozess wird kein FBX erzeugt (nur die verifizierbare
+`<rig>_skeleton.json`-Metadatei). Damit der Befehl trotzdem end-to-end nutzbar
+ist, rendert SWIFT ohne Blender einen **SDF-Preview** (`core/sdf_preview.py`):
+Der prozedurale Charakter (Skelett + Kapsel-/Kugel-Formen aus
+`core/procedural/character_def.py`) wird über den reinen Python-Raymarcher
+(`core/sdf/`) zu transparenten RGBA-Idle-Frames gerendert und wie gewohnt zu
+Sheet + kanonischem v1.4.0-Manifest exportiert — direkt
+`SHADED.addActor()`-kompatibel. Qualität: stilisiertes Mannequin (Preview),
+kein Ersatz für echte FBX-Renders.
 
 - Ohne `--skeleton-output` wird das Rig neben dem Eingabemodell abgelegt:
-  `<model>_procedural.fbx`.
+  `<model>_procedural.fbx` (nur mit bpy).
 - Mit `--skeleton-output <pfad>` wird ein beliebiger Zielpfad erzwungen.
 
 Parameter steuern Proportionen und Ausstattung:
@@ -318,11 +335,14 @@ python main.py render \
   --height-cm 185 --weight-kg 90 \
   --with-ik --mesh-bodies \
   --output out/hero
-# Erzeugt + rendert: character_procedural.fbx (Original character.fbx unverändert)
+# Mit Blender+bpy: rendert character_procedural.fbx (Original unverändert).
+# Ohne Blender:    SDF-Preview -> out/hero.png + out/hero_manifest.json
+#                  (+ out/hero_depth.png bei --depth-pass)
 ```
 
 Die IK-Ketten- und Mesh-Body-Geometrie werden rein (ohne Blender) berechnet und
-sind per Unit-Test verifizierbar (`tests/test_skeleton_procedural_math.py`).
+sind per Unit-Test verifizierbar (`tests/test_skeleton_procedural_math.py`);
+der SDF-Preview-Pfad in `tests/test_sdf_preview.py`.
 
 ### Palette-Swapping (Runtime-Farbvarianten)
 
@@ -354,6 +374,20 @@ deterministisch (timestamp-frei), und die `variants`-Liste round-trip-t über
 `SpriteSheetManifest`. Der GUI-Render-Tab stellt dafür das Textfeld
 **Palette variants** (Platzhalter `red,green`) bereit.
 
+
+## Bekannte Einschränkungen
+
+- **BVH-Export (`mocap`) ist partiell:** `core/mocap/bvh_exporter.py` schreibt
+  für Nicht-Root-Gelenke Null-Rotationen (Positions-Tracking ohne IK-Solver).
+  Die BVH-Dateien sind als Trajektorien-Rohdaten nutzbar, nicht als fertige
+  Retarget-Animationen.
+- **`core/video_to_sprite/ai_stylizer.py` ist experimentell und NICHT in die
+  Pipeline verdrahtet:** Es referenziert externe/private Bildmodelle und wird
+  von `video2sprite` bewusst nicht aufgerufen.
+- **Web-Demo:** benötigt zusätzlich `pip install -r web/requirements-web.txt`
+  (FastAPI/uvicorn sind absichtlich nicht in der Haupt-`requirements.txt`).
+- **`--skeleton-generator` ohne Blender** liefert den stilisierten SDF-Preview
+  (siehe oben), keine FBX-Qualität.
 
 ## Abhängigkeiten
 

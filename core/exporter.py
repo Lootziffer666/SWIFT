@@ -237,26 +237,13 @@ def export_manifest(
     return out_path
 
 
-def export_gif(
-    frame_paths: list[str],
-    out_path: str,
-    fps: int = 12,
-    loop: int = 0,
-) -> str:
-    """Export frames as animated GIF."""
-    if not frame_paths:
-        raise ValueError("No frames to export")
+def _write_gif(frames: list, out_path: str, fps: int, loop: int) -> str:
+    """Shared GIF writer for path-based and image-based export.
 
-    frames = _load_frames(frame_paths)
+    FASTOCTREE quantization supports RGBA, converting transparency to P+A as
+    GIF requires palette mode."""
     duration_ms = max(1, int(1000 / fps))
-
-    # Convert RGBA → RGBA palettized (GIF requires palette mode)
-    gif_frames = []
-    for frame in frames:
-        # FASTOCTREE supports RGBA; convert transparency to P+A for GIF
-        quantized = frame.quantize(colors=256, method=Image.Quantize.FASTOCTREE)
-        gif_frames.append(quantized)
-
+    gif_frames = [f.quantize(colors=256, method=Image.Quantize.FASTOCTREE) for f in frames]
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     gif_frames[0].save(
         out_path,
@@ -268,6 +255,18 @@ def export_gif(
         disposal=2,
     )
     return out_path
+
+
+def export_gif(
+    frame_paths: list[str],
+    out_path: str,
+    fps: int = 12,
+    loop: int = 0,
+) -> str:
+    """Export frames as animated GIF."""
+    if not frame_paths:
+        raise ValueError("No frames to export")
+    return _write_gif(_load_frames(frame_paths), out_path, fps, loop)
 
 
 def export_frames_with_metadata(
@@ -313,17 +312,10 @@ def export_sprite_sheet_from_images(
     if not frames:
         raise ValueError("No frames to export")
     frames = [f.convert("RGBA") for f in frames]
-    fw, fh = frames[0].size
-    count = len(frames)
-    cols = columns or count
-    rows = (count + cols - 1) // cols
-    sheet_w = cols * (fw + padding) - padding
-    sheet_h = rows * (fh + padding) - padding
+    rects, (sheet_w, sheet_h), _ = _compute_frame_layout(frames[0].size, len(frames), columns, padding)
     sheet = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
-    for i, frame in enumerate(frames):
-        col = i % cols
-        row = i // cols
-        sheet.paste(frame, (col * (fw + padding), row * (fh + padding)))
+    for frame, (x, y, _fw, _fh) in zip(frames, rects):
+        sheet.paste(frame, (x, y))
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     sheet.save(out_path, "PNG")
     return out_path
@@ -338,20 +330,7 @@ def export_gif_from_images(
     """Export PIL.Image frames as animated GIF without temp files."""
     if not frames:
         raise ValueError("No frames to export")
-    frames = [f.convert("RGBA") for f in frames]
-    duration_ms = max(1, int(1000 / fps))
-    gif_frames = [f.quantize(colors=256, method=Image.Quantize.FASTOCTREE) for f in frames]
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    gif_frames[0].save(
-        out_path,
-        format="GIF",
-        save_all=True,
-        append_images=gif_frames[1:],
-        duration=duration_ms,
-        loop=loop,
-        disposal=2,
-    )
-    return out_path
+    return _write_gif([f.convert("RGBA") for f in frames], out_path, fps, loop)
 
 
 class Exporter:

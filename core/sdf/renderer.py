@@ -36,6 +36,7 @@ class SDFRenderer:
         max_steps: int = 256,
         max_distance: float = 100.0,
         surface_threshold: float = 0.001,
+        transparent: bool = False,
     ) -> Image.Image:
         """
         Render the SDF using raymarching.
@@ -44,12 +45,15 @@ class SDFRenderer:
             max_steps: maximum raymarching iterations per pixel
             max_distance: maximum ray distance
             surface_threshold: distance threshold for surface detection
+            transparent: when True, misses get alpha 0 (RGBA sprite output)
+                         instead of the opaque gray background
 
         Returns:
-            PIL Image (RGBA)
+            PIL Image (RGB, or RGBA when transparent=True)
         """
         # Initialize output buffer
-        pixels = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        channels = 4 if transparent else 3
+        pixels = np.zeros((self.height, self.width, channels), dtype=np.uint8)
 
         # Camera setup
         fov_rad = math.radians(self.camera_fov)
@@ -81,10 +85,13 @@ class SDFRenderer:
                     surface_threshold,
                 )
 
-                pixels[y, x] = color
+                if transparent:
+                    pixels[y, x] = (*color, 255) if hit else (0, 0, 0, 0)
+                else:
+                    pixels[y, x] = color
 
         # Convert to PIL Image
-        img = Image.fromarray(pixels, mode="RGB")
+        img = Image.fromarray(pixels, mode="RGBA" if transparent else "RGB")
         return img
 
     def _raymarch(

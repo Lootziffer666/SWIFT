@@ -108,18 +108,19 @@ class TestSkeletonGenerator:
         assert metadata["total_joints"] == len(HUMANOID_DEF.joints)
         assert metadata["root_joint"] == "Hips"
 
-    def test_generate_with_fbx_export_creates_file(self):
+    def test_generate_with_fbx_export_without_blender(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             fbx_path = os.path.join(tmpdir, "test_char.fbx")
             params = SkeletonParams(height_cm=170, weight_kg=70)
             gen = SkeletonGenerator()
             result = gen.generate(params, export_fbx=fbx_path)
 
-            # File should exist (either as real FBX or mock)
-            assert result["fbx_path"] == fbx_path
-            assert os.path.exists(fbx_path)
+            # Without bpy no FBX may be produced — especially not a fake text
+            # file with an .fbx extension (the old placeholder broke renders).
+            assert result["fbx_path"] is None
+            assert not os.path.exists(fbx_path)
 
-            # Check that metadata file was also created (fallback behavior)
+            # The verifiable skeleton metadata JSON is still written.
             meta_path = fbx_path.replace(".fbx", "_skeleton.json")
             assert os.path.exists(meta_path)
 

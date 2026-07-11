@@ -279,43 +279,68 @@ def cmd_render(args, reporter: Reporter):
         if result['fbx_path']:
             reporter.say(f"  Rig generated (original model preserved): {result['fbx_path']}")
             render_model = result['fbx_path']
+        else:
+            reporter.say(
+                "  Rig FBX export requires running inside Blender (bpy); "
+                "skeleton metadata JSON written instead."
+            )
 
     config = RendererConfig(blender_path=args.blender)
     renderer = Renderer(config)
 
     ok, version = renderer.check()
     if not ok:
-        raise ToolMissingError(f"Blender not available: {version}")
-    reporter.say(f"Using: {version}")
+        if args.skeleton_generator and args.format == "sprite_sheet":
+            # Blender-free path: render the procedural character via the pure-
+            # Python SDF raymarcher (core/sdf_preview). Same artifact layout
+            # (sheet + canonical v1.4.0 manifest), so variants/world-states and
+            # SHADED.addActor work unchanged.
+            reporter.say(f"Blender not available ({version}) – rendering SDF preview instead.")
+            from core.sdf_preview import export_sdf_preview
+            preview = export_sdf_preview(
+                out_path=args.output or "output.png",
+                height_cm=args.height_cm,
+                weight_kg=args.weight_kg,
+                fps=args.fps,
+                anim_name=args.anim_name or "idle",
+                frame_size=(args.width, args.height),
+                depth_pass=args.depth_pass,
+            )
+            out = preview["sheet_path"]
+            reporter.say(f"Done (SDF preview): {out}")
+        else:
+            raise ToolMissingError(f"Blender not available: {version}")
+    else:
+        reporter.say(f"Using: {version}")
 
-    style = StyleParams(
-        width=args.width,
-        height=args.height,
-        fps=args.fps,
-        camera_angle=args.camera,
-        pixel_size=args.pixel_size,
-        enable_depth=args.depth_pass,
-        enable_normal=args.normal_pass,
-        enable_emissive=args.emissive_pass,
-    )
+        style = StyleParams(
+            width=args.width,
+            height=args.height,
+            fps=args.fps,
+            camera_angle=args.camera,
+            pixel_size=args.pixel_size,
+            enable_depth=args.depth_pass,
+            enable_normal=args.normal_pass,
+            enable_emissive=args.emissive_pass,
+        )
 
-    reporter.say(f"Rendering {render_model} + {args.anim or 'built-in animation'}...")
-    if args.depth_pass:
-        reporter.say("  (with depth pass enabled)")
-    if args.normal_pass:
-        reporter.say("  (with normal-map pass enabled)")
-    if args.emissive_pass:
-        reporter.say("  (with emissive pass enabled)")
-    out = renderer.render_and_export(
-        char_fbx=render_model,
-        anim_fbx=args.anim,
-        export_path=args.output,
-        export_format=args.format,
-        style=style,
-        progress_cb=reporter.progress,
-        anim_name=args.anim_name,
-    )
-    reporter.say(f"Done: {out}")
+        reporter.say(f"Rendering {render_model} + {args.anim or 'built-in animation'}...")
+        if args.depth_pass:
+            reporter.say("  (with depth pass enabled)")
+        if args.normal_pass:
+            reporter.say("  (with normal-map pass enabled)")
+        if args.emissive_pass:
+            reporter.say("  (with emissive pass enabled)")
+        out = renderer.render_and_export(
+            char_fbx=render_model,
+            anim_fbx=args.anim,
+            export_path=args.output,
+            export_format=args.format,
+            style=style,
+            progress_cb=reporter.progress,
+            anim_name=args.anim_name,
+        )
+        reporter.say(f"Done: {out}")
 
     # Phase 3: Handle palette variants
     if args.variants:
@@ -338,6 +363,7 @@ def cmd_render(args, reporter: Reporter):
     # SHADED world-state hooks: generate REAL per-state actor variants
     if args.world_states:
         reporter.say(f"\nGenerating SHADED world-state variants: {args.world_states}")
+        from PIL import Image
         from core.procedural.world_states import apply_world_state, list_world_states
         from core.sprite_sheet import WorldStateRef
 
@@ -597,6 +623,39 @@ def cmd_spritesheet(args, reporter: Reporter):
             )
 
 
+def cmd_anims(args, reporter: Reporter):
+    """Scan folders/files for FBX/BVH animations and list them (core.anim_library)."""
+    from core.anim_library import AnimLibrary
+
+    lib = AnimLibrary()
+    for target in args.paths:
+        if os.path.isfile(target):
+            lib.add_file(target)
+        elif os.path.isdir(target):
+            lib.add_folder(target, recursive=not args.no_recursive)
+        else:
+            raise InputMissingError(f"Path not found: {target}")
+
+    entries = lib.search(args.query) if args.query else lib.all()
+    if args.source:
+        entries = [e for e in entries if e.source == args.source]
+    entries.sort(key=lambda e: e.name.lower())
+
+    for e in entries:
+        rm = " [root motion]" if e.root_motion else ""
+        reporter.say(f"{e.display_name():<40} {e.source_label():<20} {e.ext}{rm}  {e.path}")
+    reporter.say(f"{len(entries)} animation(s) found.")
+
+    if reporter.json_mode:
+        _emit_success(
+            reporter,
+            "anims",
+            artifacts=[],
+            count=len(entries),
+            animations=[e.to_dict() for e in entries],
+        )
+
+
 def cmd_gui(args, reporter: Reporter):
     try:
         from gui.app import main as gui_main
@@ -675,6 +734,20 @@ def build_parser():
     p_v2s.add_argument("--colors", type=int, default=16)
     p_v2s.add_argument("--keyframes", action="store_true", help="Extract keyframes only")
 
+    # anims
+    p_anims = sub.add_parser(
+        "anims", parents=[json_parent],
+        help="Scan folders for FBX/BVH animation files and list them (source detection, root-motion flag)",
+    )
+    p_anims.add_argument("paths", nargs="+", help="Folders or single FBX/BVH files to scan")
+    p_anims.add_argument("--query", help="Filter: substring match on the animation name")
+    p_anims.add_argument(
+        "--source",
+        choices=["mixamo", "kenney", "quaternius", "unreal", "mocap", "unknown"],
+        help="Filter by detected source",
+    )
+    p_anims.add_argument("--no-recursive", action="store_true", help="Do not scan subfolders")
+
     # spritesheet
     p_ss = sub.add_parser("spritesheet", parents=[json_parent], help="Work with sprite sheets + manifest")
     p_ss.add_argument("action", choices=["list", "export", "extract"])
@@ -704,6 +777,7 @@ def main():
         "mocap": cmd_mocap,
         "video2sprite": cmd_video2sprite,
         "spritesheet": cmd_spritesheet,
+        "anims": cmd_anims,
         "gui": cmd_gui,
     }
 

@@ -150,24 +150,25 @@ class SkeletonGenerator:
 
     def _export_fbx_blender(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams,
                              ik_chains: Optional[List[Dict]] = None,
-                             mesh_bodies: Optional[List[Dict]] = None) -> str:
+                             mesh_bodies: Optional[List[Dict]] = None) -> Optional[str]:
         """
-        Export skeleton as FBX via Blender (requires bpy).
-        Falls back to mock export if Blender unavailable.
+        Export skeleton as FBX via Blender (requires bpy, i.e. running INSIDE
+        Blender's Python). Without bpy, only the verifiable JSON metadata is
+        written and None is returned — callers must not treat the rig as
+        renderable. (Previously a fake text file was written with an .fbx
+        extension and then fed into the renderer, which cannot load it.)
         """
         try:
-            import bpy
+            import bpy  # noqa: F401
             return self._build_blender_armature(
                 skeleton, out_path, params,
                 ik_chains=ik_chains or [],
                 mesh_bodies=mesh_bodies or [],
             )
         except ImportError:
-            # Blender not available; create placeholder FBX marker file for testing
-            os.makedirs(os.path.dirname(out_path), exist_ok=True)
-            # Write skeleton metadata as JSON alongside as reference. This records
-            # the IK chains and mesh bodies so the generated rig is verifiable
-            # without Blender.
+            # bpy not available: record the rig as JSON so IK chains and mesh
+            # bodies remain verifiable without Blender, but export NO fbx.
+            os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
             meta_path = out_path.replace(".fbx", "_skeleton.json")
             with open(meta_path, "w") as f:
                 json.dump(
@@ -195,10 +196,7 @@ class SkeletonGenerator:
                     f,
                     indent=2,
                 )
-            # Create a placeholder FBX file (will be replaced by real Blender export in production)
-            with open(out_path, "wb") as f:
-                f.write(b"FBX placeholder - replace with real Blender export\n")
-            return out_path
+            return None
 
     def _build_blender_armature(self, skeleton: SkeletonDef, out_path: str, params: SkeletonParams,
                                  ik_chains: Optional[List[Dict]] = None,

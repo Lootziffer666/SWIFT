@@ -4,10 +4,10 @@ End-to-end SHADED-ready actor production pipeline (demo + harness).
 This script runs the COMPLETE SWIFT actor-production path end-to-end without
 requiring Blender or the external SHADED runtime, so it can run in CI:
 
-    1. Build a base actor sprite sheet.
-         - If a real FBX + Blender are present, the full render path is used.
-         - Otherwise a synthetic character sprite sheet is generated with Pillow
-           (a few frames of a simple, animated shape).
+    1. Build a base actor sprite sheet, always synthetically with Pillow
+       (a few frames of a simple, animated character). Real FBX renders go
+       through `python main.py render`; this harness deliberately has no
+       Blender dependency so CI stays deterministic.
     2. Generate SHADED world-state variant PNGs via
        core.procedural.world_states transforms (dust, aging, heat, soot, ...).
     3. Build the SpriteSheetManifest (frameRects, frames, animations,
@@ -45,16 +45,7 @@ from core.sprite_sheet import SpriteSheetManifest, WorldStateRef
 from core.procedural import world_states as ws
 
 
-# ── synthetic base actor (used when no FBX + Blender is available) ────────────
-
-def _blender_available() -> bool:
-    """Return True only if a real FBX + Blender are both present."""
-    try:
-        import bpy  # noqa: F401  (Blender's bundled Python only)
-    except Exception:
-        return False
-    return False
-
+# ── synthetic base actor ──────────────────────────────────────────────────────
 
 def build_synthetic_actor_frames(frame_count: int = 6, frame_size=(64, 96)):
     """Return a list of PIL RGBA frames depicting a tiny bobbing character.
@@ -158,13 +149,7 @@ def build_actor_pipeline(output_dir, frame_count=6, fps=12, anim_name="idle",
         shutil.rmtree(out)
     out.mkdir(parents=True, exist_ok=True)
 
-    # 1. Base actor sprite sheet (synthetic unless Blender present).
-    if _blender_available():
-        raise NotImplementedError(
-            "Real FBX + Blender render path is not wired into this harness; "
-            "it would invoke scripts/blender_render.py. The synthetic path is "
-            "used in CI. To wire real rendering, call the blender bridge here."
-        )
+    # 1. Base actor sprite sheet (always synthetic — see module docstring).
     frames = build_synthetic_actor_frames(frame_count=frame_count)
 
     # Pack base sheet. Exporter consumes file paths, so persist frames first.

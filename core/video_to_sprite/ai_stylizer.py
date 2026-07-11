@@ -1,8 +1,14 @@
 """
 AI-backed pixel art stylization.
-Pluggable backend: currently supports any img2img API endpoint.
-The user already has working consistency via their own models (Image 2.0 / Nano Banana 2).
-This module provides the frame context and API plumbing - the model provides the style.
+
+EXPERIMENTAL — NOT wired into the pipeline. `video2sprite` deliberately does
+not call this module: it targets external/private img2img backends (the
+owner's "Image 2.0 / Nano Banana 2" models) that are unavailable in CI and in
+most deployments. It is kept as API plumbing for a future opt-in flag; see
+README "Bekannte Einschränkungen".
+
+Pluggable backend: any img2img API endpoint. This module provides the frame
+context and API plumbing - the model provides the style.
 """
 import base64
 import os

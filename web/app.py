@@ -19,6 +19,12 @@ REPO = BASE.parent
 DATA = BASE / "data"
 DATA.mkdir(exist_ok=True)
 
+# The sample endpoint reuses the canonical manifest writer from core.exporter so
+# the demo manifest is byte-compatible with what `main.py render` produces
+# (object-form frameRects — the only shape SHADED's actor loader accepts).
+sys.path.insert(0, str(REPO))
+from core.exporter import export_manifest, export_sprite_sheet  # noqa: E402
+
 app = FastAPI(title="SWIFT Web Demo")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 
@@ -27,28 +33,28 @@ _sample_manifest = None
 
 def _make_sample():
     global _sample_manifest
+    if _sample_manifest is not None and (DATA / "sample.png").exists():
+        return _sample_manifest
     fw, fh = 96, 96
     cols = 8
-    sheet = Image.new("RGBA", (fw * cols, fh), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(sheet)
-    for i in range(cols):
-        x = i * fw
-        t = i / (cols - 1)
-        cy = int(fh / 2 - (fh / 2 - 14) * math.sin(t * math.pi))
-        cx = int(fw / 2)
-        draw.ellipse([cx - 22, cy - 22, cx + 22, cy + 22], fill=(230, 90, 60, 255))
-        draw.rectangle([4, fh - 10, int(fw - 4 - (fw - 8) * t), fh - 6], fill=(90, 160, 230, 220))
-    sheet_path = DATA / "sample.png"
-    sheet.save(sheet_path, "PNG")
-    _sample_manifest = {
-        "mappingVersion": "1.4.0",
-        "sourceImage": {"w": fw * cols, "h": fh},
-        "frameRects": {f"f{i}": [i * fw, 0, fw, fh] for i in range(cols)},
-        "frames": [f"f{i}" for i in range(cols)],
-        "animations": {
-            "bounce": {"frames": [f"f{i}" for i in range(cols)], "fps": 10}
-        },
-    }
+    with tempfile.TemporaryDirectory() as tmp:
+        frame_paths = []
+        for i in range(cols):
+            t = i / (cols - 1)
+            frame = Image.new("RGBA", (fw, fh), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(frame)
+            cy = int(fh / 2 - (fh / 2 - 14) * math.sin(t * math.pi))
+            cx = fw // 2
+            draw.ellipse([cx - 22, cy - 22, cx + 22, cy + 22], fill=(230, 90, 60, 255))
+            draw.rectangle([4, fh - 10, int(fw - 4 - (fw - 8) * t), fh - 6], fill=(90, 160, 230, 220))
+            p = os.path.join(tmp, f"frame_{i:02d}.png")
+            frame.save(p, "PNG")
+            frame_paths.append(p)
+        export_sprite_sheet(frame_paths, str(DATA / "sample.png"))
+        manifest_path = os.path.join(tmp, "sample_manifest.json")
+        export_manifest(frame_paths, manifest_path, anim_name="bounce", fps=10)
+        with open(manifest_path) as f:
+            _sample_manifest = json.load(f)
     return _sample_manifest
 
 
