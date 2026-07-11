@@ -1,4 +1,4 @@
-import io
+import hmac
 import json
 import math
 import os
@@ -9,7 +9,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageDraw
@@ -18,6 +18,31 @@ BASE = Path(__file__).resolve().parent
 REPO = BASE.parent
 DATA = BASE / "data"
 DATA.mkdir(exist_ok=True)
+
+
+def _require_tool_token(
+    x_swift_key: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+):
+    """Protect private tool endpoints behind a per-deployment token.
+
+    Set SWIFT_TOOL_TOKEN in Coolify and send it either as X-SWIFT-Key or as
+    Authorization: Bearer <token>. When the token is not configured, the
+    production endpoints stay closed while the public landing demo remains
+    available.
+    """
+    expected = os.getenv("SWIFT_TOOL_TOKEN")
+    if not expected:
+        return JSONResponse(
+            {"error": "private tool API is disabled; set SWIFT_TOOL_TOKEN"},
+            status_code=403,
+        )
+    provided = x_swift_key
+    if not provided and authorization and authorization.lower().startswith("bearer "):
+        provided = authorization[7:].strip()
+    if not provided or not hmac.compare_digest(provided, expected):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    return None
 
 # The sample endpoint reuses the canonical manifest writer from core.exporter so
 # the demo manifest is byte-compatible with what `main.py render` produces
@@ -63,6 +88,11 @@ def index():
     return FileResponse(str(BASE / "static" / "index.html"))
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "swift"}
+
+
 @app.get("/api/sample")
 def api_sample():
     return {"sheet": "/api/sheet/sample.png", "manifest": _make_sample()}
@@ -77,7 +107,13 @@ def api_sheet(name: str):
 
 
 @app.post("/api/upload")
-async def api_upload(sheet: UploadFile = File(...), manifest: UploadFile = File(...)):
+async def api_upload(
+    auth_error=Depends(_require_tool_token),
+    sheet: UploadFile = File(...),
+    manifest: UploadFile = File(...),
+):
+    if auth_error:
+        return auth_error
     content = await sheet.read()
     try:
         manifest_data = json.loads(await manifest.read())
@@ -91,6 +127,7 @@ async def api_upload(sheet: UploadFile = File(...), manifest: UploadFile = File(
 
 @app.post("/api/render")
 async def api_render(
+    auth_error=Depends(_require_tool_token),
     fbx: UploadFile = File(...),
     anim: UploadFile = File(None),
     width: int = Form(64),
@@ -99,6 +136,8 @@ async def api_render(
     pixel_size: int = Form(4),
     camera: str = Form("front"),
 ):
+    if auth_error:
+        return auth_error
     tmp = Path(tempfile.mkdtemp())
     fbx_path = tmp / "model.fbx"
     fbx_path.write_bytes(await fbx.read())
