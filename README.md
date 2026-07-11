@@ -32,6 +32,11 @@ Die sechs Rollen des Ökosystems und SWIFT's Verhältnis zu ihnen:
 
 Das **TRON-Prinzip** gilt auch für SWIFT: Bedeutung, Raum und Weltzustand bleiben explizit & deterministisch – die KI (Blender-Render, optionales Neural Rendering) ist nur der letzte Darstellungsschritt. Die vollständige Orchestrierungs-/CLI-Vereinbarung ist in `docs/ORCHESTRATION.md` beschrieben; eine knappe Zusammenfassung von SWIFT's Platz im Ökosystem findet sich in `docs/ECOSYSTEM.md`.
 
+**MetaHuman als Charakterquelle:** Epics MetaHumans (UE-FBX-Export) sind direkter
+SWIFT-Input für realistische menschliche Figuren – Workflow, Export-Einstellungen
+und Lizenzrahmen in [`docs/METAHUMAN.md`](docs/METAHUMAN.md). Die Anim-Library
+erkennt MetaHuman-Dateien (`metahuman`-Pfade, `MH_`-Präfix) als eigene Quelle.
+
 ## Installation
 
 ```bash
