@@ -34,7 +34,9 @@ Background removal is applied per manifest frame rather than to the atlas as one
 
 ## BELLOWS boundary
 
-ONNX remains a local image runtime and is not replaced by BELLOWS. Any LLM/provider call used for semantic interpretation, prompt expansion, asset selection or uncertain classification must go through the `aiGateway` supplied by LAB. The current actor adapter itself is deterministic and therefore makes no provider call.
+ONNX remains a local image runtime and is not replaced by BELLOWS. Any LLM/provider call used for semantic interpretation, prompt expansion, asset selection, or uncertain classification must go through the `aiGateway` supplied by LAB. ANVIL-BELLOWS now accepts OpenAI-compatible `text`/`image_url` parts, so a future quality-review step can submit a rendered frame through BELLOWS without giving SWIFT direct provider credentials.
+
+The current actor adapter itself is deterministic and therefore makes no provider call. Inline image data for a vision review must be created only at execution time and must not be written into actor manifests or LAB bundles.
 
 Feet/baseline normalization exists as a standalone scaler capability, but no machine-readable scaler contract was present in the inspected package. LAB marks only that wiring step as `needs_human_review`; it does not claim the capability is absent.
 
