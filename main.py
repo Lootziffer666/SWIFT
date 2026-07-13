@@ -515,6 +515,12 @@ def cmd_video2sprite(args, reporter: Reporter):
         target_height=args.height,
         palette_colors=args.colors,
         lock_palette=True,
+        true_pixel=not args.no_true_pixel,
+        smart_crop=args.smart_crop,
+        crop_padding=args.crop_padding,
+        auto_scale=args.auto_scale,
+        source_pixel_size=args.source_pixel_size,
+        defringe=not args.no_defringe,
     )
     reporter.say("Pixelizing...")
     pixel_frames = pixelize_sequence([f.path for f in result.frames], pixel_dir, cfg)
@@ -529,15 +535,23 @@ def cmd_video2sprite(args, reporter: Reporter):
         exporter.to_frames_json(out)
     else:
         exporter.to_sprite_sheet(out)
+        if args.manifest:
+            manifest_out = os.path.splitext(out)[0] + "_manifest.json"
+            exporter.to_manifest(manifest_out, animation_name=args.anim_name)
+            reporter.say(f"Manifest: {manifest_out}")
     reporter.say(f"Done: {out}")
 
     if reporter.json_mode:
         _emit_success(
             reporter,
             "video2sprite",
-            artifacts=[{"type": args.format, "path": out}],
+            artifacts=(
+                [{"type": args.format, "path": out}]
+                + ([{"type": "manifest", "path": os.path.splitext(out)[0] + "_manifest.json"}]
+                   if args.format == "sprite_sheet" and args.manifest else [])
+            ),
             sheet_path=out,
-            manifest_path=None,
+            manifest_path=(os.path.splitext(out)[0] + "_manifest.json" if args.format == "sprite_sheet" and args.manifest else None),
             fps=int(result.fps),
             frame_count=len(result.frames),
         )
@@ -733,6 +747,14 @@ def build_parser():
     p_v2s.add_argument("--height", type=int, default=64)
     p_v2s.add_argument("--colors", type=int, default=16)
     p_v2s.add_argument("--keyframes", action="store_true", help="Extract keyframes only")
+    p_v2s.add_argument("--manifest", action="store_true", help="Emit a SWIFT/SHADED manifest for sprite_sheet output")
+    p_v2s.add_argument("--anim-name", default="animation", help="Animation name used in generated manifests")
+    p_v2s.add_argument("--smart-crop", action="store_true", help="Tightly crop transparent borders before resizing")
+    p_v2s.add_argument("--crop-padding", type=int, default=0, help="Transparent padding retained by --smart-crop")
+    p_v2s.add_argument("--auto-scale", action="store_true", help="Detect an existing pixel grid and qvote-downsample before resizing")
+    p_v2s.add_argument("--source-pixel-size", type=int, help="Explicit source pixel grid size for qvote-downsample")
+    p_v2s.add_argument("--no-true-pixel", action="store_true", help="Disable nearest-neighbor True Pixel resize path")
+    p_v2s.add_argument("--no-defringe", action="store_true", help="Keep semi-transparent edge pixels instead of snapping alpha")
 
     # anims
     p_anims = sub.add_parser(

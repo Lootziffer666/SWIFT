@@ -135,3 +135,31 @@ class TestExporter:
         from core.exporter import export_sprite_sheet
         with pytest.raises(ValueError):
             export_sprite_sheet([], str(tmp_path / "out.png"))
+
+class TestTruePixelPipeline:
+    def test_smart_crop_removes_transparent_border(self):
+        from core.video_to_sprite.pixelizer import smart_crop_image
+        img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        for y in range(3, 7):
+            for x in range(2, 8):
+                img.putpixel((x, y), (255, 0, 0, 255))
+        cropped = smart_crop_image(img)
+        assert cropped.size == (6, 4)
+
+    def test_qvote_downsample_uses_majority_color(self):
+        from core.video_to_sprite.pixelizer import qvote_downsample
+        img = Image.new("RGBA", (2, 2), (255, 0, 0, 255))
+        img.putpixel((0, 0), (0, 0, 255, 255))
+        out = qvote_downsample(img, 2)
+        assert out.size == (1, 1)
+        assert out.getpixel((0, 0)) == (255, 0, 0, 255)
+
+    def test_detect_pixel_scale_finds_simple_grid(self):
+        from core.video_to_sprite.pixelizer import detect_pixel_scale
+        img = Image.new("RGBA", (8, 4), (0, 0, 0, 0))
+        for x in range(0, 8, 2):
+            color = (255, 0, 0, 255) if (x // 2) % 2 == 0 else (0, 255, 0, 255)
+            for xx in range(x, x + 2):
+                for y in range(4):
+                    img.putpixel((xx, y), color)
+        assert detect_pixel_scale(img) == 2
