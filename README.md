@@ -83,6 +83,29 @@ python main.py render --model hero.fbx --world-states dust,aging --json
 | `2` | Fehlende Eingabe (Datei/Wert): Modell-FBX, Video, Sheet, Manifest, `--anim`/`--frame` oder API-Key fehlt. |
 | `3` | Externes Werkzeug fehlt: Blender (`render`) bzw. PySide6 (`gui`). |
 
+
+### Spritepipeline: True-Pixel Video → SHADED Actor
+
+Die in `spritepipeline.md` beschriebene lokale Post-Processing-Stufe ist in SWIFT bewusst
+deterministisch umgesetzt: `video2sprite` extrahiert Videoframes, optional schneidet
+transparente Ränder eng zu (`--smart-crop`), erkennt vorhandene Pixelraster
+(`--auto-scale` oder `--source-pixel-size`) und reduziert Blöcke per QVote-Mehrheitsfarbe,
+bevor die Frames per nearest-neighbor auf die Zielgröße gebracht und mit einer
+konsistenten Ankerpalette quantisiert werden. Für SHADED/ANVIL kann die Pipeline direkt
+ein Manifest erzeugen:
+
+```bash
+python main.py video2sprite hero_walk.mp4 \
+  --output out/hero_walk.png \
+  --width 64 --height 64 --colors 16 \
+  --smart-crop --auto-scale --manifest --anim-name walk
+# Output: out/hero_walk.png + out/hero_walk_manifest.json
+```
+
+Damit deckt SWIFT den praktikablen lokalen Teil der analysierten Plattformen ab: Frame-
+Extraktion, SpriteCook-artiges Tight-Cropping, AutoSprite-artige Sheet/Manifest-Ausgabe
+und MagicPixel/PixelLab-artige Pixelnormalisierung ohne proprietäre Modellabhängigkeit.
+
 ### End-to-End-Demo (ohne Blender)
 
 `scripts/demo_actor_pipeline.py` führt den kompletten SHADED-ready Actor-Pfad CI-tauglich
@@ -105,7 +128,7 @@ addActor-Kompatibilität + Manifest-Round-Trip. Details in `docs/ECOSYSTEM.md`.
 | `render` | FBX → Sprite-Sheet (+ Manifest, optional Depth/Varianten/Weltzustände) | `--model` (req), `--anim`, `--output`, `--format`, `--world-states`, `--variants`, `--depth-pass`, `--skeleton-generator`, `--height-cm`, `--weight-kg`, `--with-ik`, `--mesh-bodies`, `--skeleton-output` |
 | `analyze` | Referenz-Sheet → StyleParams (Claude Vision) | `sheet` (pos), `--api-key` |
 | `mocap` | Video → BVH | `video` (pos), `--output` |
-| `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes` |
+| `video2sprite` | Video → Pixel-Art-Sheet | `video` (pos), `--format`, `--width`/`--height`, `--colors`, `--keyframes`, `--manifest`, `--smart-crop`, `--auto-scale` |
 | `spritesheet` | Sheet + Manifest inspizieren/re-exportieren | `action` (list/export/extract), `image` (pos), `--manifest`, `--anim`, `--frame` |
 | `anims` | FBX/BVH-Animationsbibliothek scannen & listen (Quelle, Root-Motion) | `paths` (pos), `--query`, `--source`, `--no-recursive` |
 | `gui` | PySide6-GUI starten | – |

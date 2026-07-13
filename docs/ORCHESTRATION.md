@@ -255,7 +255,7 @@ Extracts frames from a video and pixelizes them into a sprite sheet (or GIF / fr
 ```
 python main.py video2sprite <video> \
   [--output OUT] [--format {sprite_sheet|gif|frames}] \
-  [--width W] [--height H] [--colors N] [--keyframes]
+  [--width W] [--height H] [--colors N] [--keyframes] [--manifest] [--smart-crop] [--auto-scale]
 ```
 
 | Argument | Required | Default | Meaning |
@@ -267,12 +267,21 @@ python main.py video2sprite <video> \
 | `--height` | no | `64` | Target frame height. |
 | `--colors` | no | `16` | Palette colors for pixelization. |
 | `--keyframes` | no | off | Extract keyframes only. |
+| `--manifest` | no | off | Emit `<out>_manifest.json` for `sprite_sheet` output. |
+| `--anim-name` | no | `animation` | Animation name written into generated manifests. |
+| `--smart-crop` | no | off | Tight transparent crop before resizing (SpriteCook-style tight crop). |
+| `--crop-padding` | no | `0` | Transparent padding retained by `--smart-crop`. |
+| `--auto-scale` | no | off | Detect source pixel grid and apply QVote majority downsampling before final resize. |
+| `--source-pixel-size` | no | auto/none | Explicit source grid size for QVote downsampling. |
+| `--no-true-pixel` | no | off | Disable nearest-neighbor True Pixel resizing. |
+| `--no-defringe` | no | off | Keep semi-transparent edge pixels instead of hard-alpha de-fringing. |
 
 **Failure modes:** `sys.exit(1)` if frame extraction fails. On success prints
 `Done: <out>` and exits `0`.
 
 **Output artifact:** a PNG sheet (default), a GIF (`--format gif`), or a frames-JSON
-directory (`--format frames`). No manifest is emitted by this command.
+directory (`--format frames`). With `--manifest` and `--format sprite_sheet`, SWIFT
+also writes `<out>_manifest.json` for direct SHADED `addActor` loading.
 
 ---
 
@@ -360,8 +369,8 @@ None (text to stdout only).
 | `<out>.gif` | `--format gif` | Animated GIF. |
 | `<out>_frames/` | `--format frames` | Frames + JSON. |
 
-No manifest is produced. If ANVIL needs a SHADED-consumable manifest from a
-`video2sprite` sheet, it must run `spritesheet` to inspect, or construct one.
+`--manifest` writes a SHADED-consumable SWIFT manifest next to `sprite_sheet` output as
+`<out>_manifest.json`. GIF and frames-directory exports remain image/metadata-only.
 
 ---
 
@@ -528,9 +537,8 @@ Implemented items are marked ✅. Remaining items are **proposed**, not yet impl
    `frame_count`, `animation_names`, `mapping_version`.
 3. ✅ **`analyze` structured output.** `analyze --json` emits the `StyleParams`
    object under the `style` key of the success summary (requires `ANTHROPIC_API_KEY`).
-4. **Manifest for `video2sprite` / `gif`.** Only `render` (sprite_sheet) emits a SHADED
-   manifest. A flag to emit a manifest for `video2sprite` output would make those sheets
-   directly `addActor`-consumable.
+4. ✅ **Manifest for `video2sprite` / `gif`.** `video2sprite --manifest` emits a SHADED
+   manifest for `sprite_sheet` output; GIF output intentionally remains manifest-less.
 5. **`--output` as directory.** Today `render --output` is a file stem; artifacts are
    derived by suffix. A directory mode would group sheet/manifest/depth/variants.
 
