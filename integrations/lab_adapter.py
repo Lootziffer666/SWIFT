@@ -301,9 +301,17 @@ def main() -> int:
         swift_summary = json.loads(result.stdout)
         sheet_value = swift_summary.get("sheet_path")
         manifest_value = swift_summary.get("manifest_path")
+        job = request["job"]
+        if not sheet_value and job["kind"] == "sheet":
+            sheet_value = str(Path(job["source"]).resolve())
+        if not manifest_value and job["kind"] == "sheet" and job.get("manifest"):
+            manifest_value = str(Path(job["manifest"]).resolve())
         sheet_path = Path(sheet_value).resolve() if sheet_value else None
         manifest_path = Path(manifest_value).resolve() if manifest_value else None
         background = {"mode": "none", "local": True, "applied": False}
+        requested_background = (request.get("options") or {}).get("backgroundRemoval", "none")
+        if requested_background != "none" and (sheet_path is None or not sheet_path.exists()):
+            raise ValueError("background removal requested but SWIFT produced no readable sprite sheet")
         if sheet_path and sheet_path.exists():
             sheet_path, background = apply_background_removal(
                 sheet_path,
