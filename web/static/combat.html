@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SWIFT · Combat Demo</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2a313c; --txt:#e6edf3; --muted:#8b97a7; --accent:#e65a3c; --accent2:#5aa0e6; --ok:#70d67a; --warn:#f1c75b; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:radial-gradient(circle at 18% 8%, rgba(230,90,60,.16), transparent 34%), radial-gradient(circle at 82% 0%, rgba(90,160,230,.14), transparent 30%), var(--bg); color:var(--txt); font:14px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  header { position:sticky; top:0; z-index:5; backdrop-filter:blur(16px); background:rgba(14,17,22,.78); padding:14px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.5px; }
+  header span { color:var(--muted); font-size:12px; }
+  nav { display:flex; gap:10px; align-items:center; }
+  nav a { color:var(--muted); text-decoration:none; font-size:12px; }
+  nav a:hover { color:var(--txt); }
+  .container { max-width:1200px; margin:0 auto; padding:20px; }
+  .panel { background:linear-gradient(180deg, rgba(28,35,44,.92), rgba(22,27,34,.96)); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .combat-arena { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:20px; }
+  .fighter-status { background:rgba(22,27,34,.6); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .fighter-name { font-size:16px; font-weight:700; margin-bottom:8px; }
+  .health-bar { width:100%; height:20px; background:rgba(11,14,19,.8); border:1px solid var(--line); border-radius:4px; overflow:hidden; margin-bottom:8px; }
+  .health-fill { height:100%; background:linear-gradient(90deg, #70d67a, #5aa0e6); transition:width 0.3s ease; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; }
+  .health-text { font-size:12px; color:var(--muted); margin-bottom:12px; }
+  .action-buttons { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .btn-action { cursor:pointer; border:1px solid var(--line); background:rgba(22,27,34,.6); color:var(--txt); border-radius:8px; padding:12px; font-weight:600; font-size:13px; transition:all 0.2s; }
+  .btn-action:hover { background:rgba(28,35,44,.8); border-color:var(--accent); }
+  .btn-action.selected { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn-action:disabled { opacity:0.5; cursor:not-allowed; }
+  .battlefield { background:repeating-conic-gradient(#1a1f27 0% 25%, #14181f 0% 50%) 50% / 40px 40px; border:2px solid var(--line); border-radius:10px; height:200px; position:relative; overflow:hidden; margin-bottom:20px; }
+  .fighter-visual { position:absolute; width:40px; height:40px; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:700; top:50%; transform:translateY(-50%); }
+  .fighter-left { left:20px; }
+  .fighter-right { right:20px; }
+  .distance-label { position:absolute; left:50%; top:10px; transform:translateX(-50%); font-size:12px; color:var(--muted); background:rgba(22,27,34,.8); padding:4px 8px; border-radius:4px; }
+  .turn-info { background:rgba(28,35,44,.6); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:20px; font-size:12px; }
+  .turn-log { background:rgba(11,14,19,.8); border:1px solid var(--line); border-radius:8px; padding:12px; max-height:200px; overflow-y:auto; font-size:11px; font-family:monospace; }
+  .log-entry { padding:4px 0; color:var(--muted); }
+  .log-hit { color:#70d67a; }
+  .log-miss { color:#f1c75b; }
+  .log-heal { color:#5aa0e6; }
+  .controls { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  .btn { cursor:pointer; border:none; border-radius:8px; padding:10px 16px; font-weight:700; font-size:13px; border:1px solid var(--line); background:rgba(22,27,34,.6); color:var(--txt); transition:all 0.2s; }
+  .btn:hover { background:rgba(28,35,44,.8); border-color:var(--accent); }
+  .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn-primary:hover { opacity:0.9; }
+  .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .msg { min-height:20px; color:var(--muted); font-size:12px; margin-top:8px; }
+  .msg.error { color:#ff7b72; }
+  .msg.success { color:#70d67a; }
+  @media (max-width:768px) { .combat-arena { grid-template-columns:1fr; } .action-buttons { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>⚔ SWIFT Combat</h1><span>Playable Turn-Based Combat Demo</span></div>
+  <nav><a href="/">← Zurück zur Demo</a></nav>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <h2>Kampf-Arena</h2>
+    <div class="turn-info">
+      <div id="turnInfo">Warte auf Kampfstart...</div>
+    </div>
+
+    <div class="battlefield" id="battlefield">
+      <div class="distance-label" id="distanceLabel">Entfernung: -</div>
+      <div class="fighter-visual fighter-left" id="fighter1Visual">🗡️</div>
+      <div class="fighter-visual fighter-right" id="fighter2Visual">⚔️</div>
+    </div>
+
+    <div class="combat-arena">
+      <!-- Fighter 1 -->
+      <div class="fighter-status">
+        <div class="fighter-name" id="fighter1Name">Kämpfer 1</div>
+        <div class="health-bar">
+          <div class="health-fill" id="fighter1Bar" style="width: 100%;">
+            <span id="fighter1HealthText"></span>
+          </div>
+        </div>
+        <div class="health-text" id="fighter1Health">100/100 HP</div>
+        <div class="action-buttons" id="fighter1Actions">
+          <button class="btn-action" data-fighter="0" data-action="attack" title="Starker Angriff: 70% Hit, 25 Schaden">⚔️ Angriff</button>
+          <button class="btn-action" data-fighter="0" data-action="defend" title="Verteidigung: +50% Damage-Reduktion, +20% Ausweich">🛡️ Verteidigung</button>
+          <button class="btn-action" data-fighter="0" data-action="dodge" title="Ausweichmanöver: +60% Ausweich, -30% Angriff">💨 Ausweichen</button>
+          <button class="btn-action" data-fighter="0" data-action="wait" title="Warten: Regeneriert 10 HP">❤️ Warten</button>
+        </div>
+      </div>
+
+      <!-- Fighter 2 -->
+      <div class="fighter-status">
+        <div class="fighter-name" id="fighter2Name">Kämpfer 2</div>
+        <div class="health-bar">
+          <div class="health-fill" id="fighter2Bar" style="width: 100%;">
+            <span id="fighter2HealthText"></span>
+          </div>
+        </div>
+        <div class="health-text" id="fighter2Health">100/100 HP</div>
+        <div class="action-buttons" id="fighter2Actions">
+          <button class="btn-action" data-fighter="1" data-action="attack" title="Starker Angriff: 70% Hit, 25 Schaden">⚔️ Angriff</button>
+          <button class="btn-action" data-fighter="1" data-action="defend" title="Verteidigung: +50% Damage-Reduktion, +20% Ausweich">🛡️ Verteidigung</button>
+          <button class="btn-action" data-fighter="1" data-action="dodge" title="Ausweichmanöver: +60% Ausweich, -30% Angriff">💨 Ausweichen</button>
+          <button class="btn-action" data-fighter="1" data-action="wait" title="Warten: Regeneriert 10 HP">❤️ Warten</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="turn-log" id="turnLog">Kampf-Log wird hier angezeigt...</div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnStart">🎮 Neuer Kampf</button>
+      <button class="btn" id="btnReset" disabled>🔄 Reset</button>
+    </div>
+
+    <div class="msg" id="message"></div>
+  </div>
+</div>
+
+<script>
+let sessionId = null;
+let selectedActions = [null, null];
+
+function showMessage(text, type = '') {
+  const msg = document.getElementById('message');
+  msg.textContent = text;
+  msg.className = 'msg ' + type;
+}
+
+async function startCombat() {
+  try {
+    const res = await fetch('/api/combat/start?fighter1=Held&fighter2=Gegner', { method: 'POST' });
+    const data = await res.json();
+    if (!data.session_id) throw new Error('Keine Session erstellt');
+
+    sessionId = data.session_id;
+    selectedActions = [null, null];
+
+    // UI aktualisieren
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnReset').disabled = false;
+    document.querySelectorAll('.btn-action').forEach(btn => btn.disabled = false);
+
+    updateStatus(data.status);
+    showMessage('Kampf gestartet! Wähle deine Aktionen.', 'success');
+    updateLog('Kampf beginnt!');
+  } catch (e) {
+    showMessage('Fehler beim Starten: ' + e.message, 'error');
+  }
+}
+
+async function selectAction(fighter, action) {
+  if (!sessionId) {
+    showMessage('Starte zuerst einen Kampf!', 'error');
+    return;
+  }
+
+  selectedActions[fighter] = action;
+
+  // Button-Styling
+  document.querySelectorAll(`[data-fighter="${fighter}"]`).forEach(btn => {
+    btn.classList.remove('selected');
+  });
+  document.querySelector(`[data-fighter="${fighter}"][data-action="${action}"]`).classList.add('selected');
+
+  // Wenn beide Kämpfer bereit sind, führe Turn aus
+  if (selectedActions[0] && selectedActions[1]) {
+    await executeTurn(selectedActions[0], selectedActions[1]);
+    selectedActions = [null, null];
+    document.querySelectorAll('.btn-action').forEach(btn => btn.classList.remove('selected'));
+  }
+}
+
+async function executeTurn(action1, action2) {
+  try {
+    const res1 = await fetch(`/api/combat/action/${sessionId}?fighter=0&action=${action1}`, { method: 'POST' });
+    const res2 = await fetch(`/api/combat/action/${sessionId}?fighter=1&action=${action2}`, { method: 'POST' });
+
+    const data2 = await res2.json();
+
+    if (!data2.status) throw new Error('Ungültige Response');
+
+    // Turn-Log aktualisieren
+    if (data2.turn && data2.turn.events) {
+      data2.turn.events.forEach(evt => {
+        const fighter = evt.fighter === 0 ? 'Held' : 'Gegner';
+        if (evt.type === 'attack') {
+          const status = evt.hit ? `trifft für ${evt.damage} Schaden!` : 'verfehlt!';
+          updateLog(`${fighter} ${evt.msg}`, evt.hit ? 'log-hit' : 'log-miss');
+        } else if (evt.type === 'defend') {
+          updateLog(`${fighter} ${evt.msg}`);
+        } else if (evt.type === 'dodge') {
+          updateLog(`${fighter} ${evt.msg}`);
+        } else if (evt.type === 'wait') {
+          updateLog(`${fighter} ${evt.msg}`, 'log-heal');
+        }
+      });
+    }
+
+    updateStatus(data2.status);
+
+    if (data2.status.is_over) {
+      const winner = data2.status.winner;
+      showMessage(`🎉 ${winner} gewinnt den Kampf!`, 'success');
+      document.querySelectorAll('.btn-action').forEach(btn => btn.disabled = true);
+    } else {
+      showMessage(`Turn ${data2.status.turn} abgeschlossen. Wähle deine nächste Aktion.`, '');
+    }
+  } catch (e) {
+    showMessage('Fehler bei Turn: ' + e.message, 'error');
+  }
+}
+
+function updateStatus(status) {
+  // Fighter 1
+  document.getElementById('fighter1Name').textContent = status.fighter1.name;
+  const health1 = status.fighter1.health;
+  const maxHealth1 = status.fighter1.max_health;
+  document.getElementById('fighter1Health').textContent = `${health1}/${maxHealth1} HP`;
+  document.getElementById('fighter1Bar').style.width = `${status.fighter1.health_percent * 100}%`;
+
+  // Fighter 2
+  document.getElementById('fighter2Name').textContent = status.fighter2.name;
+  const health2 = status.fighter2.health;
+  const maxHealth2 = status.fighter2.max_health;
+  document.getElementById('fighter2Health').textContent = `${health2}/${maxHealth2} HP`;
+  document.getElementById('fighter2Bar').style.width = `${status.fighter2.health_percent * 100}%`;
+
+  // Distance
+  const distance = status.distance.toFixed(1);
+  const rangeType = status.is_melee ? '⚔️ Melee' : '📏 Range';
+  document.getElementById('distanceLabel').textContent = `${rangeType} · ${distance} Einheiten`;
+
+  // Turn info
+  document.getElementById('turnInfo').textContent = `Turn ${status.turn} · Distanz: ${distance} · Beide Kämpfer bereit`;
+
+  // Visual update
+  const f1Pos = (status.fighter1.position / 10) * 100;
+  const f2Pos = (status.fighter2.position / 10) * 100;
+  document.getElementById('fighter1Visual').style.left = f1Pos + '%';
+  document.getElementById('fighter2Visual').style.left = f2Pos + '%';
+}
+
+function updateLog(entry, className = '') {
+  const log = document.getElementById('turnLog');
+  const line = document.createElement('div');
+  line.className = 'log-entry ' + className;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${entry}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+document.getElementById('btnStart').addEventListener('click', startCombat);
+document.getElementById('btnReset').addEventListener('click', async () => {
+  if (sessionId) {
+    await fetch(`/api/combat/reset/${sessionId}`, { method: 'POST' });
+    selectedActions = [null, null];
+    document.querySelectorAll('.btn-action').forEach(btn => {
+      btn.classList.remove('selected');
+      btn.disabled = false;
+    });
+    document.getElementById('turnLog').innerHTML = '';
+    updateLog('Kampf wurde zurückgesetzt.');
+    showMessage('Kampf wurde zurückgesetzt. Wähle neue Aktionen!', '');
+    await fetch(`/api/combat/status/${sessionId}`).then(r => r.json()).then(updateStatus);
+  }
+});
+
+document.querySelectorAll('.btn-action').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const fighter = parseInt(btn.getAttribute('data-fighter'));
+    const action = btn.getAttribute('data-action');
+    selectAction(fighter, action);
+  });
+  btn.disabled = true;
+});
+
+updateLog('Kampf-Demo bereit. Klicke „Neuer Kampf" zum Starten!');
+</script>
+</body>
+</html>
