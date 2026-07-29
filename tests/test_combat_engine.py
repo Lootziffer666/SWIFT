@@ -92,13 +92,10 @@ def test_wait_regeneration():
     """Test that wait action regenerates health."""
     engine = CombatEngine()
 
-    # Damage fighter1 first via attack from fighter2
-    engine.set_action(0, ActionType.WAIT)
-    engine.set_action(1, ActionType.ATTACK)
-    engine.execute_turn()
-
+    # Start from a deterministic damaged state. The regeneration test must not
+    # depend on whether a random setup attack happens to hit.
+    engine.fighter1.stats.current_health = 50
     health_after_damage = engine.fighter1.stats.current_health
-    assert health_after_damage < 100, "Fighter1 should have taken damage"
 
     # Now both wait
     engine.set_action(0, ActionType.WAIT)
