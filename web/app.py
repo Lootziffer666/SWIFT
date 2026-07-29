@@ -230,6 +230,11 @@ def combat_action(session_id: str, fighter: int, action: str):
 
     engine = _combat_sessions[session_id]
 
+    if fighter not in (0, 1):
+        return JSONResponse(
+            {"error": "fighter must be 0 or 1"}, status_code=400
+        )
+
     # Validiere Aktion
     try:
         action_type = ActionType(action)
