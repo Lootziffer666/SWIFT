@@ -19,6 +19,10 @@ REPO = BASE.parent
 DATA = BASE / "data"
 DATA.mkdir(exist_ok=True)
 
+# Combat engine
+sys.path.insert(0, str(REPO))
+from core.combat_engine import CombatEngine, ActionType  # noqa: E402
+
 
 def _require_tool_token(
     x_swift_key: str | None = Header(default=None),
@@ -47,11 +51,13 @@ def _require_tool_token(
 # The sample endpoint reuses the canonical manifest writer from core.exporter so
 # the demo manifest is byte-compatible with what `main.py render` produces
 # (object-form frameRects — the only shape SHADED's actor loader accepts).
-sys.path.insert(0, str(REPO))
 from core.exporter import export_manifest, export_sprite_sheet  # noqa: E402
 
 app = FastAPI(title="SWIFT Web Demo")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
+
+# Combat session store (in-memory for demo purposes)
+_combat_sessions = {}
 
 _sample_manifest = None
 
@@ -192,3 +198,81 @@ async def api_render(
         except Exception:
             manifest_data = None
     return {"sheet": f"/api/sheet/{uid}.png", "manifest": manifest_data}
+
+
+# Combat API endpoints
+@app.post("/api/combat/start")
+def combat_start(fighter1: str = "Fighter 1", fighter2: str = "Fighter 2"):
+    """Starte eine neue Kampf-Session."""
+    session_id = uuid.uuid4().hex
+    engine = CombatEngine(fighter1_name=fighter1, fighter2_name=fighter2)
+    _combat_sessions[session_id] = engine
+    return {
+        "session_id": session_id,
+        "status": engine.get_status(),
+    }
+
+
+@app.get("/api/combat/status/{session_id}")
+def combat_status(session_id: str):
+    """Gib Status einer Kampf-Session."""
+    if session_id not in _combat_sessions:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+    engine = _combat_sessions[session_id]
+    return engine.get_status()
+
+
+@app.post("/api/combat/action/{session_id}")
+def combat_action(session_id: str, fighter: int, action: str):
+    """Registriere eine Aktion und wende den Turn aus (wenn beide Kämpfer bereit sind)."""
+    if session_id not in _combat_sessions:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+
+    engine = _combat_sessions[session_id]
+
+    # Validiere Aktion
+    try:
+        action_type = ActionType(action)
+    except ValueError:
+        return JSONResponse(
+            {"error": f"invalid action: {action}"}, status_code=400
+        )
+
+    # Registriere Aktion
+    if not engine.set_action(fighter, action_type):
+        return JSONResponse(
+            {"error": f"action '{action}' out of range"}, status_code=400
+        )
+
+    # Wenn beide Kämpfer bereit sind, führe Turn aus
+    if engine.pending_actions[0] is not None and engine.pending_actions[1] is not None:
+        turn_result = engine.execute_turn()
+        return {
+            "turn": turn_result,
+            "status": engine.get_status(),
+        }
+
+    return {
+        "waiting": True,
+        "status": engine.get_status(),
+    }
+
+
+@app.post("/api/combat/reset/{session_id}")
+def combat_reset(session_id: str):
+    """Setze Kampf zurück."""
+    if session_id not in _combat_sessions:
+        return JSONResponse({"error": "session not found"}, status_code=404)
+
+    engine = _combat_sessions[session_id]
+    engine.reset()
+    return engine.get_status()
+
+
+@app.delete("/api/combat/{session_id}")
+def combat_delete(session_id: str):
+    """Lösche eine Kampf-Session."""
+    if session_id in _combat_sessions:
+        del _combat_sessions[session_id]
+        return {"deleted": True}
+    return JSONResponse({"error": "session not found"}, status_code=404)
