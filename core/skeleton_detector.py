@@ -130,13 +130,13 @@ class SkeletonDetector:
 class StickFigureRenderer:
     """Rendert Skelette als Stick Figures."""
 
-    # Styling
-    BONE_WIDTH = 3
-    JOINT_RADIUS = 4
-    BONE_COLOR = (200, 200, 200)
-    JOINT_COLOR = (255, 100, 100)
+    # Styling - mit besseren Kontrasten
+    BONE_WIDTH = 4
+    JOINT_RADIUS = 5
+    BONE_COLOR = (50, 50, 50)          # Dunkelgrau
+    JOINT_COLOR = (255, 50, 50)        # Rot
     HIGHLIGHT_COLOR = (100, 255, 100)
-    BG_COLOR = (20, 20, 30)
+    BG_COLOR = (240, 240, 240)         # Heller Hintergrund!
 
     @staticmethod
     def render_stick_figure(
