@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pillow opencv-python-headless mediapipe anthropic numpy pytest
+          pip install pillow opencv-python-headless mediapipe anthropic numpy pytest fastapi httpx python-multipart
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
