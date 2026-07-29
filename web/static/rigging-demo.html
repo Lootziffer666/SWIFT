@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SWIFT · Procedural Rigging Demo</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2a313c; --txt:#e6edf3; --muted:#8b97a7; --accent:#e65a3c; --accent2:#5aa0e6; --ok:#70d67a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px ui-sans-serif,system-ui,sans-serif; }
+  header { backdrop-filter:blur(16px); background:rgba(14,17,22,.9); padding:16px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  header h1 { margin:0; font-size:16px; }
+  nav a { color:var(--muted); text-decoration:none; font-size:12px; margin-left:20px; }
+  nav a:hover { color:var(--txt); }
+  .container { max-width:1200px; margin:0 auto; padding:20px; }
+  .panel { background:rgba(22,27,34,.6); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0; }
+  h2 { font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:0 0 16px; }
+  .canvas-box { border:1px solid var(--line); border-radius:8px; background:#0b0e13; padding:10px; }
+  canvas { display:block; image-rendering:pixelated; max-width:100%; background:#14181f; }
+  .controls { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin:16px 0; }
+  .btn { cursor:pointer; border:1px solid var(--line); background:rgba(22,27,34,.6); color:var(--txt); padding:10px 14px; border-radius:8px; font-weight:600; font-size:13px; transition:all 0.2s; }
+  .btn:hover { background:rgba(28,35,44,.8); border-color:var(--accent); }
+  .btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .slider-group { margin:16px 0; }
+  .slider-label { font-size:12px; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; }
+  input[type="range"] { width:100%; }
+  input[type="range"] { -webkit-appearance:none; appearance:none; background:#0b0e13; border:1px solid var(--line); border-radius:4px; height:6px; outline:none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; background:var(--accent); border-radius:50%; cursor:pointer; }
+  input[type="range"]::-moz-range-thumb { width:14px; height:14px; background:var(--accent); border-radius:50%; cursor:pointer; border:none; }
+  .info { font-size:12px; color:var(--muted); margin:12px 0; padding:12px; background:rgba(11,14,19,.6); border-radius:6px; }
+  .stat { display:inline-block; margin-right:20px; }
+  .stat-label { font-size:11px; color:var(--muted); }
+  .stat-value { font-size:14px; color:var(--txt); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚔ Procedural Rigging Demo</h1>
+  <nav><a href="/">← Home</a><a href="/combat.html">Combat</a></nav>
+</header>
+
+<div class="container">
+  <div class="panel">
+    <h2>Skeleton-Basierte Kampf-Animation</h2>
+    <p style="color:var(--muted); font-size:13px; margin:0 0 20px;">Erkannte Skelette werden prozedural zu verschiedenen Kampf-Aktionen animiert. Motion Capture → Stick Figure → Sketch → Cartoon → Realistic.</p>
+
+    <div class="grid-2">
+      <!-- Fighter 1 -->
+      <div>
+        <h3 style="margin-top:0;">Fighter 1 · Attack Sequence</h3>
+        <div class="controls">
+          <button class="btn" data-action="attack">⚔️ Attack</button>
+          <button class="btn" data-action="defend">🛡️ Defend</button>
+          <button class="btn" data-action="dodge">💨 Dodge</button>
+          <button class="btn" data-action="wait">❤️ Wait</button>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Animation Progress</span>
+            <span id="f1Progress">0%</span>
+          </div>
+          <input type="range" id="f1Slider" min="0" max="100" value="0">
+        </div>
+
+        <div class="canvas-box">
+          <canvas id="f1Canvas" width="256" height="256"></canvas>
+        </div>
+
+        <div class="info">
+          <div class="stat">
+            <div class="stat-label">Action</div>
+            <div class="stat-value" id="f1Action">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Frame</div>
+            <div class="stat-value" id="f1Frame">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fighter 2 -->
+      <div>
+        <h3 style="margin-top:0;">Fighter 2 · Defense Sequence</h3>
+        <div class="controls">
+          <button class="btn" data-action="attack">⚔️ Attack</button>
+          <button class="btn" data-action="defend">🛡️ Defend</button>
+          <button class="btn" data-action="dodge">💨 Dodge</button>
+          <button class="btn" data-action="wait">❤️ Wait</button>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>Animation Progress</span>
+            <span id="f2Progress">0%</span>
+          </div>
+          <input type="range" id="f2Slider" min="0" max="100" value="0">
+        </div>
+
+        <div class="canvas-box">
+          <canvas id="f2Canvas" width="256" height="256"></canvas>
+        </div>
+
+        <div class="info">
+          <div class="stat">
+            <div class="stat-label">Action</div>
+            <div class="stat-value" id="f2Action">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Frame</div>
+            <div class="stat-value" id="f2Frame">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:30px; padding:20px; background:rgba(11,14,19,.6); border-radius:8px; border-left:3px solid var(--accent2);">
+      <h3 style="margin-top:0; color:var(--accent2);">📊 System Overview</h3>
+      <p style="color:var(--muted); font-size:13px; margin:0;">
+        <strong>Phase 1 (aktuell):</strong> Skelett-Erkennung via MediaPipe Pose Detection.<br>
+        <strong>Phase 2:</strong> Procedural Pose Generation basierend auf Combat State.<br>
+        <strong>Phase 3:</strong> Multi-Style Rendering (Sketch, Cartoon, Realistic).<br>
+        <strong>Phase 4:</strong> Real-time Combat Animation mit Blender Integration.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// Demo-Daten (später von Backend laden)
+const demoData = {
+  "fighter1": {
+    "skeleton": {
+      "joints": [
+        {"name": "nose", "x": 0.5, "y": 0.2},
+        {"name": "left_shoulder", "x": 0.35, "y": 0.35},
+        {"name": "right_shoulder", "x": 0.65, "y": 0.35},
+        {"name": "left_elbow", "x": 0.2, "y": 0.5},
+        {"name": "right_elbow", "x": 0.8, "y": 0.5},
+        {"name": "left_wrist", "x": 0.1, "y": 0.65},
+        {"name": "right_wrist", "x": 0.9, "y": 0.65},
+        {"name": "left_hip", "x": 0.4, "y": 0.65},
+        {"name": "right_hip", "x": 0.6, "y": 0.65},
+        {"name": "left_knee", "x": 0.35, "y": 0.85},
+        {"name": "right_knee", "x": 0.65, "y": 0.85},
+      ],
+      "bones": [
+        [0, 1], [0, 2], [1, 3], [2, 4], [3, 5], [4, 6],
+        [1, 7], [2, 8], [7, 9], [8, 10]
+      ]
+    }
+  }
+};
+
+// State
+let state = {
+  fighter1: { action: "attack", progress: 0, selected_action: "attack" },
+  fighter2: { action: "defend", progress: 0, selected_action: "defend" }
+};
+
+// Render Functions
+function drawStickFigure(ctx, skeleton, scale = 1.0, offsetX = 0, offsetY = 0) {
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+
+  // Clear
+  ctx.fillStyle = "#0e1116";
+  ctx.fillRect(0, 0, width, height);
+
+  // Bones
+  ctx.strokeStyle = "#c8c8c8";
+  ctx.lineWidth = 3;
+  for (const [j1, j2] of skeleton.bones) {
+    const p1 = skeleton.joints[j1];
+    const p2 = skeleton.joints[j2];
+    if (p1 && p2) {
+      ctx.beginPath();
+      ctx.moveTo(p1.x * width + offsetX, p1.y * height + offsetY);
+      ctx.lineTo(p2.x * width + offsetX, p2.y * height + offsetY);
+      ctx.stroke();
+    }
+  }
+
+  // Joints
+  ctx.fillStyle = "#ff6464";
+  for (const joint of skeleton.joints) {
+    if (joint) {
+      ctx.beginPath();
+      ctx.arc(joint.x * width + offsetX, joint.y * height + offsetY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function updateCanvas(canvasId, action, progress) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+
+  // Modify skeleton based on action
+  let modifiedSkeleton = JSON.parse(JSON.stringify(demoData.fighter1.skeleton));
+
+  // Simple procedural animation
+  const intensity = progress / 100;
+  if (action === "attack") {
+    // Arm extends forward
+    modifiedSkeleton.joints[5].x = 0.1 - intensity * 0.3;
+    modifiedSkeleton.joints[6].x = 0.9 + intensity * 0.3;
+    modifiedSkeleton.joints[4].x = 0.8 + intensity * 0.2;
+  } else if (action === "defend") {
+    // Arms up
+    modifiedSkeleton.joints[3].y = 0.5 - intensity * 0.2;
+    modifiedSkeleton.joints[4].y = 0.5 - intensity * 0.2;
+  } else if (action === "dodge") {
+    // Lean back
+    modifiedSkeleton.joints[0].x = 0.5 - intensity * 0.1;
+    for (let i = 1; i < modifiedSkeleton.joints.length; i++) {
+      if (modifiedSkeleton.joints[i]) {
+        modifiedSkeleton.joints[i].x -= intensity * 0.1;
+      }
+    }
+  }
+
+  drawStickFigure(ctx, modifiedSkeleton);
+}
+
+// Event Handlers
+document.querySelectorAll('[data-action]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const fighterNum = e.target.closest('.grid-2').children.indexOf(e.target.closest('[data-action]').closest('div'));
+    const action = e.target.getAttribute('data-action');
+
+    if (fighterNum === 0) {
+      state.fighter1.selected_action = action;
+      document.querySelectorAll('[data-action]').slice(0, 4).forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      updateCanvas('f1Canvas', state.fighter1.selected_action, state.fighter1.progress);
+      document.getElementById('f1Action').textContent = action;
+    } else {
+      state.fighter2.selected_action = action;
+      document.querySelectorAll('[data-action]').slice(4, 8).forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      updateCanvas('f2Canvas', state.fighter2.selected_action, state.fighter2.progress);
+      document.getElementById('f2Action').textContent = action;
+    }
+  });
+});
+
+document.getElementById('f1Slider').addEventListener('input', (e) => {
+  state.fighter1.progress = parseInt(e.target.value);
+  document.getElementById('f1Progress').textContent = state.fighter1.progress + '%';
+  document.getElementById('f1Frame').textContent = Math.floor(state.fighter1.progress / 10);
+  updateCanvas('f1Canvas', state.fighter1.selected_action, state.fighter1.progress);
+});
+
+document.getElementById('f2Slider').addEventListener('input', (e) => {
+  state.fighter2.progress = parseInt(e.target.value);
+  document.getElementById('f2Progress').textContent = state.fighter2.progress + '%';
+  document.getElementById('f2Frame').textContent = Math.floor(state.fighter2.progress / 10);
+  updateCanvas('f2Canvas', state.fighter2.selected_action, state.fighter2.progress);
+});
+
+// Init
+document.querySelectorAll('[data-action]').slice(0, 1)[0].classList.add('active');
+document.querySelectorAll('[data-action]').slice(4, 5)[0].classList.add('active');
+updateCanvas('f1Canvas', 'attack', 0);
+updateCanvas('f2Canvas', 'defend', 0);
+document.getElementById('f1Action').textContent = 'attack';
+document.getElementById('f2Action').textContent = 'defend';
+</script>
+</body>
+</html>
