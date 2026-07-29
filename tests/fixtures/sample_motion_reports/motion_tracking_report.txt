@@ -1,0 +1,54 @@
+======================================================================
+KÖRPERTEIL-ANALYSE (Motion Tracking)
+======================================================================
+
+Head (head)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (5/5 Joints)
+  Bewegung: 0.00 Pixel (über 10 Frames)
+    • nose                 Dist=    0.00px  Conf=95.8%  Vel=  0.00px/f
+    • left_eye             Dist=    0.00px  Conf=92.8%  Vel=  0.00px/f
+    • right_eye            Dist=    0.00px  Conf=93.8%  Vel=  0.00px/f
+    • left_ear             Dist=    0.00px  Conf=89.8%  Vel=  0.00px/f
+    • right_ear            Dist=    0.00px  Conf=90.8%  Vel=  0.00px/f
+
+Torso (torso)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (4/4 Joints)
+  Bewegung: 0.00 Pixel (über 10 Frames)
+    • left_shoulder        Dist=    0.00px  Conf=94.8%  Vel=  0.00px/f
+    • right_shoulder       Dist=    0.00px  Conf=95.8%  Vel=  0.00px/f
+    • left_hip             Dist=    0.00px  Conf=93.5%  Vel=  0.00px/f
+    • right_hip            Dist=    0.00px  Conf=94.5%  Vel=  0.00px/f
+
+Left Arm (left_arm)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (3/3 Joints)
+  Bewegung: 0.78 Pixel (über 10 Frames)
+    • left_shoulder        Dist=    0.00px  Conf=94.8%  Vel=  0.00px/f
+    • left_elbow           Dist=    0.34px  Conf=92.2%  Vel=  0.00px/f
+    • left_wrist           Dist=    0.44px  Conf=86.3%  Vel=  0.00px/f
+
+Right Arm (right_arm)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (3/3 Joints)
+  Bewegung: 0.78 Pixel (über 10 Frames)
+    • right_shoulder       Dist=    0.00px  Conf=95.8%  Vel=  0.00px/f
+    • right_elbow          Dist=    0.34px  Conf=93.2%  Vel=  0.00px/f
+    • right_wrist          Dist=    0.44px  Conf=87.3%  Vel=  0.00px/f
+
+Left Leg (left_leg)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (3/3 Joints)
+  Bewegung: 0.00 Pixel (über 10 Frames)
+    • left_hip             Dist=    0.00px  Conf=93.5%  Vel=  0.00px/f
+    • left_knee            Dist=    0.00px  Conf=90.5%  Vel=  0.00px/f
+    • left_ankle           Dist=    0.00px  Conf=87.5%  Vel=  0.00px/f
+
+Right Leg (right_leg)
+  Status: ✓ SICHTBAR
+  Vollständig: ✓ (3/3 Joints)
+  Bewegung: 0.00 Pixel (über 10 Frames)
+    • right_hip            Dist=    0.00px  Conf=94.5%  Vel=  0.00px/f
+    • right_knee           Dist=    0.00px  Conf=91.5%  Vel=  0.00px/f
+    • right_ankle          Dist=    0.00px  Conf=88.5%  Vel=  0.00px/f
