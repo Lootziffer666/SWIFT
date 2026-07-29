@@ -228,6 +228,7 @@ class CombatEngine:
 
         # 4. Verarbeite ATTACK-Aktionen (simultane Angriffe)
         if action1 == ActionType.ATTACK and self.is_in_range(action1):
+            self.fighter1.last_action = action1
             base_damage = self.fighter1.stats.attack_power
             if action1_is_dodge:
                 base_damage = int(base_damage * 0.7)  # Dodge reduziert Angriff
@@ -250,6 +251,7 @@ class CombatEngine:
                 })
 
         if action2 == ActionType.ATTACK and self.is_in_range(action2):
+            self.fighter2.last_action = action2
             base_damage = self.fighter2.stats.attack_power
             if action2_is_dodge:
                 base_damage = int(base_damage * 0.7)  # Dodge reduziert Angriff
