@@ -31,7 +31,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import fk, quat
+from . import fk
 from .glb import Clip
 from .rig import Rig
 
@@ -247,10 +247,3 @@ def derive(
             spans.append(Span(site, "planted", start, clip.frame_count - 1, target))
 
     return ContactSchedule(clip.name, rig.id, clip.frame_count, spans)
-
-
-def world_point(rig: Rig, clip: Clip, site: str, frame: int) -> quat.Vec3:
-    """Weltposition einer Kontaktstelle in einem Frame."""
-    contact = next(c for c in rig.contacts if c.name == site)
-    pose = fk.solve(rig, clip, frame, include_root_translation=True)
-    return pose[contact.node].local_to_world(contact.point)

@@ -328,7 +328,6 @@ def _solve_group(
 
     by_name = {c.name: c for c in rig.contacts}
     locals_ = [by_name[s].point for s in sites]
-    bend_axis = _bend_axis(rig, mid_bone)
     clip.rotations.setdefault(root_bone, [quat.IDENTITY] * clip.frame_count)
     clip.rotations.setdefault(mid_bone, [quat.IDENTITY] * clip.frame_count)
     clip.rotations.setdefault(end_bone, [quat.IDENTITY] * clip.frame_count)

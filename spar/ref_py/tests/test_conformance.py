@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from spar import conformance, contact, fixed, fk, quat, retarget, sim
+from spar import conformance, contact, fixed, fk, retarget, sim
 
 
 @pytest.fixture
