@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spar"
+version = "0.1.0"
+description = "Engine-agnostic fighter core: format spec and reference implementation"
+requires-python = ">=3.10"
+dependencies = ["Pillow>=10.0.0"]
+
+[project.scripts]
+spar = "spar.cli:main"
+
+[tool.setuptools]
+packages = ["spar"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Ohne das findet ein blosses `pytest tests` das Paket nicht: pytest legt bei der
+# Vorgabe-Importweise nur das Testverzeichnis auf sys.path, nicht das Wurzelverzeichnis.
+# `python -m pytest` funktioniert auch ohne, weil -m das Arbeitsverzeichnis ergaenzt --
+# genau diese Abweichung zwischen lokalem Aufruf und CI-Aufruf hat den Job rot gemacht.
+pythonpath = ["."]
