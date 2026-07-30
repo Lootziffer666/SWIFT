@@ -135,3 +135,122 @@ class TestWorldStateStats:
             out = fn(base, 0.5)
             assert out.size == base.size
             assert out.mode == "RGBA"
+
+
+class TestWearFollowsGeometryNotPaint:
+    """The defect this module was restructured to fix.
+
+    ``aging`` used to derive "edge wear" from ``np.gradient(luminance)``. A painted
+    stripe and a real groove produce the same luminance gradient, so the wear followed
+    the artwork. It looked like weathering and was actually an edge-detect filter.
+    """
+
+    SIZE = 64
+
+    def _painted_edge(self):
+        """Uniform geometry, hard colour boundary down the middle."""
+        arr = np.zeros((self.SIZE, self.SIZE, 4), dtype=np.uint8)
+        arr[..., 3] = 255
+        arr[:, : self.SIZE // 2, :3] = 40
+        arr[:, self.SIZE // 2 :, :3] = 210
+        flat_depth = np.full((self.SIZE, self.SIZE), 128.0, dtype=np.float32)
+        return Image.fromarray(arr, "RGBA"), flat_depth
+
+    def _geometric_ridge(self):
+        """Uniform colour, a real ridge down the middle (nearer camera = smaller Z)."""
+        arr = np.full((self.SIZE, self.SIZE, 4), 255, dtype=np.uint8)
+        arr[..., :3] = 125
+        depth = np.full((self.SIZE, self.SIZE), 200.0, dtype=np.float32)
+        depth[:, self.SIZE // 2 - 4 : self.SIZE // 2 + 4] = 120.0
+        return Image.fromarray(arr, "RGBA"), depth
+
+    def _band_delta(self, before, after, lo, hi):
+        """How much the transform changed a vertical band, in luma."""
+        b = np.asarray(before.convert("RGB"), dtype=np.float32)[:, lo:hi].mean()
+        a = np.asarray(after.convert("RGB"), dtype=np.float32)[:, lo:hi].mean()
+        return abs(a - b)
+
+    def _wear_only(self, img, depth):
+        """Apply wear alone.
+
+        ``aging`` also carries macro breakup at ±20 luma, which is louder than the wear
+        it would be measuring. Isolating the channel tests the claim instead of the
+        noise floor of one particular recipe.
+        """
+        from core.procedural.world_states import SurfaceRecipe, _apply_recipe
+
+        return _apply_recipe(img, SurfaceRecipe(wear=1.0), 1.0, "probe", depth=depth)
+
+    def test_painted_edge_gets_no_extra_wear(self):
+        img, depth = self._painted_edge()
+        out = self._wear_only(img, depth)
+        mid = self.SIZE // 2
+        at_boundary = self._band_delta(img, out, mid - 6, mid + 6)
+        away = self._band_delta(img, out, 4, 16)
+        assert at_boundary == pytest.approx(away, abs=1.0), (
+            "wear tracked the painted edge — the luminance-gradient defect is back"
+        )
+
+    def test_geometric_ridge_does_get_wear(self):
+        """The band spans the ridge *and its lips*.
+
+        Wear peaks at the rim rather than the crown, which is where paint actually rubs
+        through — measuring only the flat top of the bar understates it.
+        """
+        img, depth = self._geometric_ridge()
+        out = self._wear_only(img, depth)
+        mid = self.SIZE // 2
+        on_ridge = self._band_delta(img, out, mid - 6, mid + 6)
+        off_ridge = self._band_delta(img, out, 4, 16)
+        assert on_ridge > off_ridge + 4.0, (
+            "a real ridge produced no more wear than flat plate"
+        )
+
+    def test_luminance_gradient_would_fail_the_pair(self):
+        """Guards the guard.
+
+        Reproduces the old approach and shows it cannot tell the two cases apart, so
+        the pair above genuinely discriminates rather than passing for free.
+        """
+        def old_edge_response(img):
+            rgb = np.asarray(img.convert("RGB"), dtype=np.float32)
+            lum = 0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]
+            gy, gx = np.gradient(lum)
+            e = np.sqrt(gx**2 + gy**2)
+            return e / (e.max() + 1e-6)
+
+        painted, _ = self._painted_edge()
+        ridge, _ = self._geometric_ridge()
+        mid = self.SIZE // 2
+        # The old proxy fires hard on the painted edge...
+        assert old_edge_response(painted)[:, mid - 2 : mid + 2].mean() > 0.4
+        # ...and not at all on the geometric one, which carries no colour change.
+        assert old_edge_response(ridge)[:, mid - 2 : mid + 2].mean() < 0.01
+
+
+class TestSaturationGuard:
+    def test_no_recipe_exceeds_the_ceiling(self):
+        from core.procedural.world_states import MAX_SATURATION, _rgb_to_hsv
+
+        img = Image.new("RGBA", (64, 64), (255, 20, 20, 255))
+        for state in list_world_states():
+            out = apply_world_state(img, state, 1.0)
+            rgb = np.asarray(out.convert("RGB"), dtype=np.float32)
+            _, sat, _ = _rgb_to_hsv(rgb)
+            assert float(sat.mean()) <= MAX_SATURATION + 1e-6, state
+
+
+class TestDepthIsOptional:
+    def test_every_state_runs_without_depth(self):
+        img = Image.new("RGBA", (48, 48), (150, 130, 110, 255))
+        for state in list_world_states():
+            out = apply_world_state(img, state, 0.8)
+            assert out.mode == "RGBA" and out.size == img.size
+
+    def test_depth_changes_the_result(self):
+        img = Image.new("RGBA", (64, 64), (150, 130, 110, 255))
+        depth = np.full((64, 64), 200.0, dtype=np.float32)
+        depth[:, 28:36] = 120.0
+        without = np.asarray(apply_world_state(img, "aging", 0.9))
+        with_ = np.asarray(apply_world_state(img, "aging", 0.9, depth=depth))
+        assert not np.array_equal(without, with_)
