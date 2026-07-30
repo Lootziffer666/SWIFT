@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swift.local/spec/baked.schema.json",
+  "title": "fcd-baked/1",
+  "description": "Runtime-Form der Kampfdaten. Enthaelt Weltraum-AABBs pro Frame als Fixed-Point-Integer, aufgeloest gegen die Pose des Clips. Die Runtime braucht dafuer weder glTF noch Forward Kinematics noch Gleitkomma - das ist der Grund, warum zwei Implementierungen in verschiedenen Sprachen bit-identisch simulieren koennen.",
+  "type": "object",
+  "required": ["schema", "unit_scale", "fps", "frame_count", "frames"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "fcd-baked/1" },
+    "unit_scale": {
+      "const": 256,
+      "description": "Subunits pro Weltenheit. 1 Weltenheit = 1 Meter."
+    },
+    "fps": { "type": "integer", "minimum": 1 },
+    "frame_count": { "type": "integer", "minimum": 1 },
+    "source": {
+      "type": "object",
+      "description": "Woraus gebaken wurde. Fuer Reproduzierbarkeit, nicht fuer die Runtime.",
+      "additionalProperties": false,
+      "properties": {
+        "clip": { "type": "string" },
+        "combat": { "type": "string" },
+        "animation": { "type": "string" },
+        "rig": { "type": "string", "description": "Rig-ID, z.B. biped/1" },
+        "mirrored": { "type": "boolean", "default": false }
+      }
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["frame", "hit", "hurt"],
+        "additionalProperties": false,
+        "properties": {
+          "frame": { "type": "integer", "minimum": 0 },
+          "flags": { "type": "array", "items": { "type": "string" } },
+          "cancel": { "type": "array", "items": { "type": "string" } },
+          "hit": { "type": "array", "items": { "$ref": "#/$defs/aabb" } },
+          "hurt": { "type": "array", "items": { "$ref": "#/$defs/aabb" } },
+          "move": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "Gameplay-Root-Motion in Subunits"
+          }
+        }
+      }
+    },
+
+    "on_hit": { "$ref": "#/$defs/impact_fixed" },
+    "on_block": { "$ref": "#/$defs/impact_fixed" }
+  },
+
+  "$defs": {
+    "aabb": {
+      "type": "object",
+      "required": ["min", "max"],
+      "additionalProperties": false,
+      "description": "Achsenparallele Box im Weltraum des Clips bei facing=+1 und Root bei (0,0,0). Die Runtime addiert Kaempferposition und spiegelt bei facing=-1. Konservativ gerundet: min abwaerts, max aufwaerts, damit Rundung nie einen Treffer verschluckt.",
+      "properties": {
+        "min": { "type": "array", "items": { "type": "integer" }, "minItems": 3, "maxItems": 3 },
+        "max": { "type": "array", "items": { "type": "integer" }, "minItems": 3, "maxItems": 3 },
+        "id": { "type": "string" },
+        "node": { "type": "string", "description": "Nur zur Diagnose. Die Runtime ignoriert das Feld." }
+      }
+    },
+    "impact_fixed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "damage": { "type": "integer", "minimum": 0 },
+        "hitstun": { "type": "integer", "minimum": 0 },
+        "blockstun": { "type": "integer", "minimum": 0 },
+        "pushback": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "In Subunits"
+        }
+      }
+    }
+  }
+}

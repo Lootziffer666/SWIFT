@@ -1,0 +1,763 @@
+{
+  "comparison": "exact",
+  "expected": {
+    "events": [
+      {
+        "frame": 0,
+        "kind": "move_start",
+        "source": "A"
+      },
+      {
+        "frame": 3,
+        "kind": "block",
+        "source": "A",
+        "target": "B"
+      },
+      {
+        "frame": 7,
+        "kind": "move_end",
+        "source": "A"
+      }
+    ],
+    "trace": [
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 0,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -48
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 48
+        },
+        "frame": 1
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 1,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -48
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 48
+        },
+        "frame": 2
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 2,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -48
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 48
+        },
+        "frame": 3
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 3,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -41
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 7,
+          "x": 86
+        },
+        "frame": 4
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 4,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 6,
+          "x": 86
+        },
+        "frame": 5
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 5,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 5,
+          "x": 86
+        },
+        "frame": 6
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 6,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 4,
+          "x": 86
+        },
+        "frame": 7
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 3,
+          "x": 86
+        },
+        "frame": 8
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 2,
+          "x": 86
+        },
+        "frame": 9
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 4,
+          "stun": 1,
+          "x": 86
+        },
+        "frame": 10
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 86
+        },
+        "frame": 11
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 86
+        },
+        "frame": 12
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 86
+        },
+        "frame": 13
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": -26
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 86
+        },
+        "frame": 14
+      }
+    ]
+  },
+  "id": "sim/block-absorbs",
+  "input": {
+    "fighters": [
+      {
+        "facing": 1,
+        "name": "A",
+        "x": -40
+      },
+      {
+        "facing": -1,
+        "name": "B",
+        "x": 40
+      }
+    ],
+    "log": [
+      [
+        4,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        8
+      ]
+    ],
+    "moves": {
+      "attack": {
+        "fps": 60,
+        "frame_count": 7,
+        "frames": [
+          {
+            "flags": [
+              "grounded"
+            ],
+            "frame": 0,
+            "hit": [],
+            "hurt": [
+              {
+                "max": [
+                  35,
+                  126,
+                  35
+                ],
+                "min": [
+                  -35,
+                  53,
+                  -35
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ]
+          },
+          {
+            "flags": [
+              "grounded"
+            ],
+            "frame": 1,
+            "hit": [],
+            "hurt": [
+              {
+                "max": [
+                  38,
+                  126,
+                  38
+                ],
+                "min": [
+                  -38,
+                  53,
+                  -38
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ]
+          },
+          {
+            "flags": [
+              "grounded"
+            ],
+            "frame": 2,
+            "hit": [],
+            "hurt": [
+              {
+                "max": [
+                  32,
+                  126,
+                  32
+                ],
+                "min": [
+                  -32,
+                  53,
+                  -32
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ],
+            "move": [
+              15,
+              0,
+              0
+            ]
+          },
+          {
+            "flags": [
+              "grounded"
+            ],
+            "frame": 3,
+            "hit": [
+              {
+                "id": "jab_fist",
+                "max": [
+                  101,
+                  88,
+                  -22
+                ],
+                "min": [
+                  65,
+                  42,
+                  -68
+                ],
+                "node": "Hand.R"
+              }
+            ],
+            "hurt": [
+              {
+                "max": [
+                  37,
+                  126,
+                  37
+                ],
+                "min": [
+                  -37,
+                  53,
+                  -37
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ],
+            "move": [
+              15,
+              0,
+              0
+            ]
+          },
+          {
+            "cancel": [
+              "attack"
+            ],
+            "flags": [
+              "grounded"
+            ],
+            "frame": 4,
+            "hit": [
+              {
+                "id": "jab_fist",
+                "max": [
+                  119,
+                  104,
+                  -9
+                ],
+                "min": [
+                  71,
+                  64,
+                  -58
+                ],
+                "node": "Hand.R"
+              }
+            ],
+            "hurt": [
+              {
+                "max": [
+                  39,
+                  126,
+                  39
+                ],
+                "min": [
+                  -39,
+                  53,
+                  -39
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ]
+          },
+          {
+            "cancel": [
+              "attack"
+            ],
+            "flags": [
+              "grounded"
+            ],
+            "frame": 5,
+            "hit": [],
+            "hurt": [
+              {
+                "max": [
+                  32,
+                  126,
+                  32
+                ],
+                "min": [
+                  -32,
+                  53,
+                  -32
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ]
+          },
+          {
+            "flags": [
+              "grounded"
+            ],
+            "frame": 6,
+            "hit": [],
+            "hurt": [
+              {
+                "max": [
+                  35,
+                  126,
+                  35
+                ],
+                "min": [
+                  -35,
+                  53,
+                  -35
+                ],
+                "node": "Chest"
+              },
+              {
+                "max": [
+                  29,
+                  41,
+                  26
+                ],
+                "min": [
+                  -29,
+                  -16,
+                  -26
+                ],
+                "node": "Hips"
+              }
+            ]
+          }
+        ],
+        "on_block": {
+          "blockstun": 7,
+          "damage": 0,
+          "hitstun": 0,
+          "pushback": [
+            31,
+            0,
+            0
+          ]
+        },
+        "on_hit": {
+          "blockstun": 0,
+          "damage": 4,
+          "hitstun": 10,
+          "pushback": [
+            46,
+            0,
+            0
+          ]
+        },
+        "schema": "fcd-baked/1",
+        "source": {
+          "animation": "jab",
+          "clip": "jab.glb",
+          "combat": "",
+          "mirrored": false,
+          "rig": "biped/1"
+        },
+        "tags": [
+          "attack",
+          "punch",
+          "standing",
+          "light"
+        ],
+        "unit_scale": 256
+      }
+    },
+    "rules": {
+      "max_health": 100,
+      "push_apart": 96,
+      "stage_max": 1536,
+      "stage_min": -1536,
+      "walk_speed": 6
+    }
+  },
+  "note": "Derselbe Jab gegen gehaltenen Block: kein Schaden, Blockstun statt Hitstun.",
+  "tier": "sim"
+}

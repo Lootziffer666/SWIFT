@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swift.local/spec/capture.schema.json",
+  "title": "swift-capture/1",
+  "description": "Verrauschte Pose-Beobachtung aus Video oder GIF. Ausdruecklich unvollstaendig: fehlende Joints, niedrige Konfidenz und Kamerschnitte sind normale Zustaende, keine Fehler.",
+  "type": "object",
+  "required": ["schema", "source", "shots", "subjects", "frames"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "swift-capture/1" },
+
+    "source": {
+      "type": "object",
+      "required": ["path", "sha256", "width", "height", "fps", "frame_count"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash der Quelldatei. Macht abgeleitete Daten rueckverfolgbar."
+        },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "frame_count": { "type": "integer", "minimum": 1 },
+        "provenance": {
+          "type": "object",
+          "description": "Herkunft und Rechtelage. Haelt die Frage beantwortbar, statt sie zu vergessen; beantwortet sie nicht.",
+          "additionalProperties": false,
+          "properties": {
+            "holder": { "type": ["string", "null"] },
+            "license": { "type": ["string", "null"] },
+            "watermarked": { "type": "boolean" },
+            "note": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "shots": {
+      "type": "array",
+      "description": "Kamerschnitt-Segmente. Tracking laeuft NIE ueber eine Shot-Grenze hinweg - sonst wird ein Schnitt als Bewegung interpretiert.",
+      "items": {
+        "type": "object",
+        "required": ["id", "start_frame", "end_frame"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "integer", "minimum": 0 },
+          "start_frame": { "type": "integer", "minimum": 0 },
+          "end_frame": { "type": "integer", "minimum": 0 },
+          "camera": {
+            "enum": ["static", "pan", "zoom", "unknown"],
+            "default": "unknown"
+          }
+        }
+      }
+    },
+
+    "subjects": {
+      "type": "array",
+      "description": "Verfolgte Figuren. Eine Subject-ID gilt ueber Shot-Grenzen hinweg nur, wenn die Zuordnung bestaetigt wurde.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "shots": { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["frame", "shot", "subject", "joints"],
+        "additionalProperties": false,
+        "properties": {
+          "frame": { "type": "integer", "minimum": 0 },
+          "shot": { "type": "integer", "minimum": 0 },
+          "subject": { "type": "string" },
+          "time_ms": { "type": "number" },
+          "joints": {
+            "type": "object",
+            "description": "Fehlende Joints werden weggelassen, nicht auf null gesetzt.",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["conf", "src"],
+              "additionalProperties": false,
+              "properties": {
+                "x2": { "type": "number", "description": "Bildkoordinate, normalisiert 0..1" },
+                "y2": { "type": "number", "description": "Bildkoordinate, normalisiert 0..1" },
+                "x3": { "type": "number", "description": "Metrisch, hueftzentriert (MediaPipe pose_world_landmarks)" },
+                "y3": { "type": "number" },
+                "z3": { "type": "number" },
+                "conf": { "type": "number", "minimum": 0, "maximum": 1 },
+                "src": {
+                  "enum": ["auto", "manual", "interpolated"],
+                  "description": "manual sticht auto; interpolated wird beim Neu-Solven verworfen."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

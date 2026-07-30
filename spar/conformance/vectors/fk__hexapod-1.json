@@ -1,0 +1,296 @@
+{
+  "comparison": "approx",
+  "expected": {
+    "frames": [
+      {
+        "Abdomen": {
+          "position": [
+            0.0,
+            0.0,
+            0.22
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa1.L": {
+          "position": [
+            -0.09,
+            -0.01,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa1.R": {
+          "position": [
+            0.09,
+            -0.01,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa2.L": {
+          "position": [
+            -0.09,
+            -0.01,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa2.R": {
+          "position": [
+            0.09,
+            -0.01,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa3.L": {
+          "position": [
+            -0.09,
+            -0.01,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Coxa3.R": {
+          "position": [
+            0.09,
+            -0.01,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur1.L": {
+          "position": [
+            -0.25,
+            0.04,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur1.R": {
+          "position": [
+            0.25,
+            0.04,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur2.L": {
+          "position": [
+            -0.25,
+            0.04,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur2.R": {
+          "position": [
+            0.25,
+            0.04,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur3.L": {
+          "position": [
+            -0.25,
+            0.04,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Femur3.R": {
+          "position": [
+            0.25,
+            0.04,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Head": {
+          "position": [
+            0.0,
+            0.0,
+            -0.14
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Thorax": {
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia1.L": {
+          "position": [
+            -0.38,
+            -0.15,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia1.R": {
+          "position": [
+            0.38,
+            -0.15,
+            -0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia2.L": {
+          "position": [
+            -0.38,
+            -0.15,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia2.R": {
+          "position": [
+            0.38,
+            -0.15,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia3.L": {
+          "position": [
+            -0.38,
+            -0.15,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "Tibia3.R": {
+          "position": [
+            0.38,
+            -0.15,
+            0.1
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        }
+      }
+    ]
+  },
+  "id": "fk/hexapod-1",
+  "input": {
+    "clip": {
+      "fps": 30,
+      "frame_count": 1,
+      "root_translation": [],
+      "rotations": {}
+    },
+    "include_root_translation": true,
+    "rig": "hexapod/1"
+  },
+  "note": "Welttransforms je Frame. Ein einziger Vorwaertsdurchlauf genuegt, weil Eltern in der Rig-Reihenfolge vor Kindern stehen.",
+  "tier": "fk",
+  "tolerance": 1e-06
+}

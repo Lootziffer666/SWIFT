@@ -1,0 +1,29 @@
+{
+  "comparison": "exact",
+  "expected": {
+    "fixed": [
+      1,
+      2,
+      3,
+      4,
+      -1,
+      -2,
+      -3
+    ]
+  },
+  "id": "fixed/half-away-from-zero",
+  "input": {
+    "unit_scale": 256,
+    "values": [
+      0.001953125,
+      0.005859375,
+      0.009765625,
+      0.013671875,
+      -0.001953125,
+      -0.005859375,
+      -0.009765625
+    ]
+  },
+  "note": "Nicht Bankers Rounding. Pythons round() rundet halbe Werte zur naechsten geraden Zahl; in anderen Sprachen ist das nicht die Voreinstellung, und zwei konforme Implementierungen liefen auseinander.",
+  "tier": "fixed"
+}

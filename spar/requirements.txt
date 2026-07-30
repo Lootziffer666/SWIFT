@@ -1,0 +1,4 @@
+# Referenz-Implementierung: absichtlich winzig.
+# Kein mediapipe, kein Blender, kein PySide6 -- spar/ ist selbstenthalten, damit
+# `git subtree split -P spar` es in ein eigenes Repository loesen kann.
+Pillow>=10.0.0
