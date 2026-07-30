@@ -120,10 +120,16 @@ class Rig:
         symmetry: dict[str, str],
         contacts: list[Contact],
         mass: dict[str, float],
+        reference_height: float = 0.0,
     ) -> None:
         self.id = rig_id
         self.name = name
         self.root = root
+        self.reference_height = reference_height
+        """Nominelle Standhoehe in Metern. Massstab fuer Groessen, die sich auf den
+        Koerper beziehen statt auf die Welt -- etwa wie weit Retargeting die Root
+        absenken darf. Ohne sie waere so eine Grenze fuer einen 0.35 m hohen
+        Sechsbeiner dieselbe wie fuer einen 1.7 m hohen Biped."""
         self.bones = _topological(bones, root)
         self.by_name = {b.name: b for b in self.bones}
         self.index = {b.name: i for i, b in enumerate(self.bones)}
@@ -216,6 +222,7 @@ class Rig:
             symmetry=symmetry,
             contacts=contacts,
             mass=dict(data.get("mass_distribution") or {}),
+            reference_height=float(data.get("reference_height", 0.0)),
         )
         rig.validate()
         return rig

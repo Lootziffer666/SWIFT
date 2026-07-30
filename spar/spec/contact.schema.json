@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spar.dev/spec/contact.schema.json",
+  "title": "SPAR Kontaktplan (spar-contact/1)",
+  "description": "Woran ein Körper in einem bestimmten Clip koppelt, Frame für Frame. Das Rig sagt, wo Kontakt möglich ist; dieser Plan sagt, wo er stattfindet.",
+  "type": "object",
+  "required": ["schema", "clip", "rig", "frame_count", "spans"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "spar-contact/1" },
+    "clip": {
+      "type": "string",
+      "description": "Name des Clips, zu dem dieser Plan gehört."
+    },
+    "rig": {
+      "type": "string",
+      "description": "Rig-ID, deren Kontaktstellen die Spannen referenzieren."
+    },
+    "frame_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Länge des Clips. Jede Spanne muss vollständig hineinpassen."
+    },
+    "spans": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["site", "kind", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "Name einer Kontaktstelle aus der Rig-Datei."
+        },
+        "kind": {
+          "enum": ["planted", "sliding", "pushing", "carried"],
+          "description": "planted = fixiert, der Weltpunkt darf sich nicht bewegen. sliding = bleibt auf der Fläche, darf sich darauf bewegen. pushing = trägt Kraft, nur auf Druck. carried = folgt einem Objekt statt der Welt."
+        },
+        "from": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Erster Frame der Spanne, inklusiv."
+        },
+        "to": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Letzter Frame der Spanne, INKLUSIV. Eine Spanne [4, 4] ist genau ein Frame. Wer 'to' exklusiv liest, verliert je Spanne den letzten Frame — am Absprung genau den, der die Bewegung trägt. Vektor-gepinnt durch contact/spans-are-inclusive."
+        },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": ["ground", "prop", "world"],
+          "description": "Woran gekoppelt wird."
+        },
+        "y": {
+          "type": "number",
+          "description": "Bodenhöhe bei type=ground, in Metern."
+        },
+        "id": {
+          "type": "string",
+          "description": "Objektkennung bei type=prop."
+        }
+      }
+    }
+  }
+}

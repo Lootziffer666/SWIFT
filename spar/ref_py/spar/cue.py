@@ -17,6 +17,7 @@ import math
 from dataclasses import dataclass
 
 from . import fk, quat
+from .contact import ContactSchedule
 from .glb import Clip
 from .rig import Rig
 
@@ -219,6 +220,84 @@ def check_foot_slide(
     return out
 
 
+# ------------------------------------------------------- Kontaktdrift (L3)
+
+
+MIN_DRIFT_THRESHOLD = 0.001
+"""Untergrenze fuer die Driftschwelle, in Metern.
+
+Absolut, nicht aus der beobachteten Streuung abgeleitet. Eine rein relative Schwelle
+meldet in einem Clip, in dem sich fast nichts bewegt, das Gleitkommarauschen als Drift
+-- dieselbe Falle wie bei der Perzentil-Kalibrierung in
+``core/procedural/surface.py``.
+"""
+
+
+def check_contact_drift(
+    rig: Rig,
+    clip: Clip,
+    schedule: "ContactSchedule",
+    threshold: float = 0.005,
+) -> list[Finding]:
+    """Was der Kontaktplan als ``planted`` fuehrt, darf sich nicht bewegen.
+
+    Der Unterschied zu :func:`check_foot_slide` ist nicht die Rechnung, sondern die
+    Gewissheit. Dort wird Kontakt *geraten* -- "nah genug am Boden" -- und die Pruefung
+    ist nur so gut wie die Vermutung: ein Fuss, der absichtlich knapp ueber dem Boden
+    schwebt, wird faelschlich geprueft, ein rutschender Fuss auf einer Stufe gar nicht.
+    Hier steht im Plan, was gilt, und die Pruefung ist eine Aussage statt einer Ahnung.
+
+    ``sliding`` wird bewusst nicht beanstandet -- gleiten ist dort die Absicht.
+    """
+    out: list[Finding] = []
+    limit = max(threshold, MIN_DRIFT_THRESHOLD)
+    by_name = {c.name: c for c in rig.contacts}
+
+    for span in schedule.of_kind("planted"):
+        contact = by_name.get(span.site)
+        if contact is None:
+            continue
+        anchor: quat.Vec3 | None = None
+        for frame in range(span.start, min(span.end, clip.frame_count - 1) + 1):
+            pose = fk.solve(rig, clip, frame, include_root_translation=True)
+            world = pose[contact.node].local_to_world(contact.point)
+
+            # Zwei getrennte Aussagen, und beide werden gebraucht. Ein Kontakt kann
+            # ueber alle Frames voellig unbewegt sein und trotzdem zehn Zentimeter
+            # ueber dem Boden schweben -- nur gegen den Vorframe zu pruefen laesst
+            # genau den Fall durch, den ein Retargeting auf kuerzere Beine erzeugt.
+            if span.target.type == "ground":
+                off = abs(world[1] - span.target.y)
+                if off > limit:
+                    out.append(
+                        Finding(
+                            "contact_off_target",
+                            frame,
+                            span.site,
+                            f"eingerastet auf y={span.target.y:.3f}, "
+                            f"liegt aber {off * 1000:.1f} mm daneben",
+                            severity="error",
+                        )
+                    )
+
+            if anchor is None:
+                anchor = world
+                continue
+            moved = quat.length(quat.sub(world, anchor))
+            if moved > limit:
+                out.append(
+                    Finding(
+                        "contact_drift",
+                        frame,
+                        span.site,
+                        f"eingerastet seit Frame {span.start}, "
+                        f"aber um {moved * 1000:.1f} mm verschoben",
+                        severity="error",
+                    )
+                )
+    return out
+
+
 # ----------------------------------------------------------------- Balance
 
 
@@ -268,11 +347,23 @@ def check_balance(rig: Rig, clip: Clip, ground_y: float = 0.0, margin: float = 0
 # -------------------------------------------------------------------- alle
 
 
-def run_all(rig: Rig, clip: Clip) -> list[Finding]:
+def run_all(
+    rig: Rig, clip: Clip, schedule: "ContactSchedule | None" = None
+) -> list[Finding]:
+    """Alle Pruefungen.
+
+    Liegt ein Kontaktplan vor, ersetzt die exakte Driftpruefung das Raten von
+    :func:`check_foot_slide`. Beide laufen zu lassen hiesse, denselben Fuss zweimal zu
+    beanstanden -- einmal begruendet, einmal vermutet.
+    """
     return (
         check_bone_lengths(rig, clip)
         + check_joint_limits(rig, clip)
-        + check_foot_slide(rig, clip)
+        + (
+            check_contact_drift(rig, clip, schedule)
+            if schedule is not None
+            else check_foot_slide(rig, clip)
+        )
         + check_balance(rig, clip)
     )
 

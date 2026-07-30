@@ -1,0 +1,49 @@
+{
+  "comparison": "exact",
+  "expected": {
+    "engaged_per_frame": [
+      [
+        "heel_l"
+      ],
+      [
+        "heel_l"
+      ],
+      [
+        "heel_l"
+      ],
+      [
+        "heel_l"
+      ],
+      [
+        "toe_l"
+      ],
+      [],
+      [],
+      []
+    ],
+    "frame_counts": {
+      "heel_l": 4,
+      "toe_l": 1
+    }
+  },
+  "id": "contact/spans-are-inclusive",
+  "input": {
+    "frame_count": 8,
+    "spans": [
+      {
+        "from": 0,
+        "kind": "planted",
+        "site": "heel_l",
+        "to": 3
+      },
+      {
+        "from": 4,
+        "kind": "planted",
+        "site": "toe_l",
+        "to": 4
+      }
+    ]
+  },
+  "note": "'to' ist inklusiv. Eine Spanne [4, 4] ist genau ein Frame. Wer sie exklusiv liest, verliert je Spanne den letzten Frame -- am Absprung genau den, der die Bewegung traegt. Ohne festgeschriebene Konvention waehlt eine Implementierung das eine und die naechste das andere.",
+  "tier": "contact"
+}

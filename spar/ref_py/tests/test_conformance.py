@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from spar import conformance, fixed, fk, quat, sim
+from spar import conformance, contact, fixed, fk, quat, retarget, sim
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def test_vectors_are_committed():
     """Die Vektoren liegen im Repository, nicht nur im Generator."""
     files = list(conformance.VECTOR_DIR.glob("*.json"))
     assert files, f"keine Vektoren in {conformance.VECTOR_DIR}"
-    assert len(files) >= 14
+    assert len(files) >= 19
 
 
 def test_all_vectors_pass():
@@ -108,6 +108,77 @@ def test_detects_boxes_rounded_inward(restore):
     restore(fixed, "ceil_fixed", lambda v: int(v * fixed.UNIT_SCALE))
     _, _, failures = conformance.run()
     assert any("box-rounds-outward" in f for f in failures)
+
+
+def test_detects_exclusive_spans(restore):
+    """``to`` ist inklusiv. Exklusiv gelesen faellt je Spanne der letzte Frame weg."""
+    restore(contact.Span, "covers", lambda self, f: self.start <= f < self.end)
+    _, _, failures = conformance.run()
+    assert any("spans-are-inclusive" in f for f in failures)
+
+
+def test_detects_root_shift_as_mean(restore):
+    """Der Mittelwert laesst den tiefsten Kontakt unerreichbar."""
+    restore(
+        retarget, "combine_requirements", lambda deltas: sum(deltas) / len(deltas)
+    )
+    _, _, failures = conformance.run()
+    assert any("root-shift" in f for f in failures)
+
+
+def test_detects_root_shift_clamped_to_negative(restore):
+    """Nur-Absenken laesst ein langbeinigeres Ziel in der Hocke stehen."""
+    restore(retarget, "combine_requirements", lambda deltas: min(min(deltas), 0.0))
+    _, _, failures = conformance.run()
+    assert any("hexapod" in f for f in failures)
+
+
+def test_detects_reach_ignored_in_root_shift(restore):
+    """Nur die Hoehendifferenz zu rechnen laesst den Fuss um die fehlende
+    Reichweite ueber dem Boden schweben -- sichtbar erst bei kuerzeren Gliedmassen."""
+    original = retarget.root_shift_for
+
+    def height_only(rig, clip, schedule, frame, targets):
+        from spar import fk as fk_mod
+
+        pose = fk_mod.solve(rig, clip, frame, include_root_translation=True)
+        deltas = []
+        for span in schedule.engaged_at(frame):
+            c = next((x for x in rig.contacts if x.name == span.site), None)
+            if c is None or span.site not in targets:
+                continue
+            current = pose[c.node].local_to_world(c.point)
+            deltas.append(targets[span.site][1] - current[1])
+        return min(deltas) if deltas else 0.0
+
+    restore(retarget, "root_shift_for", height_only)
+    assert original is not retarget.root_shift_for
+    _, _, failures = conformance.run()
+    assert any("retarget-preserves-planted" in f for f in failures)
+
+
+def test_detects_straight_rest_pose_assumption(restore):
+    """Ein Loeser, der die Ruhelage der Kette fuer gerade haelt, kommt beim Biped
+    durch -- Schienbein und Fuss zeigen beide senkrecht nach unten -- und faellt beim
+    Insektenbein auf, dessen Femur und Tibia im Winkel zueinander stehen."""
+    original = retarget._chain_rotations
+
+    def assume_straight(rig, mid_bone, end_bone, goal_dir, interior, normal):
+        import math as _m
+
+        from spar import quat as q
+
+        a = rig.by_name[mid_bone].offset
+        b = rig.by_name[end_bone].offset
+        mid_rot = q.canonical(q.from_axis_angle(normal, interior - _m.pi))
+        reached = q.add(a, q.apply(mid_rot, b))
+        root_rot = q.canonical(retarget._rotation_between(retarget._unit(reached), goal_dir))
+        return root_rot, mid_rot
+
+    restore(retarget, "_chain_rotations", assume_straight)
+    assert original is not retarget._chain_rotations
+    _, _, failures = conformance.run()
+    assert any("hexapod" in f for f in failures)
 
 
 # ------------------------------------------------------- Szenario-Gehalt
