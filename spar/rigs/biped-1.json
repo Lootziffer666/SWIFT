@@ -1,0 +1,93 @@
+{
+  "schema": "spar-rig/1",
+  "id": "biped/1",
+  "name": "Humanoid Biped",
+  "units": "meters",
+  "up": "Y",
+  "forward": "-Z",
+  "root": "Hips",
+  "reference_height": 1.7,
+
+  "bones": [
+    { "name": "Hips",       "parent": null,         "offset": [0.0, 0.0, 0.0],
+      "joint": { "type": "ball", "swing": 180.0, "twist": [-180.0, 180.0] },
+      "roles": ["root", "pelvis"] },
+
+    { "name": "Spine",      "parent": "Hips",       "offset": [0.0, 0.15, 0.0],
+      "joint": { "type": "ball", "swing": 30.0, "twist": [-35.0, 35.0] } },
+
+    { "name": "Chest",      "parent": "Spine",      "offset": [0.0, 0.12, 0.0],
+      "joint": { "type": "ball", "swing": 25.0, "twist": [-30.0, 30.0] },
+      "roles": ["head_carrier"] },
+
+    { "name": "Shoulder.L", "parent": "Chest",      "offset": [-0.18, 0.08, 0.0],
+      "joint": { "type": "ball", "swing": 20.0, "twist": [-15.0, 15.0] } },
+    { "name": "Shoulder.R", "parent": "Chest",      "offset": [0.18, 0.08, 0.0],
+      "joint": { "type": "ball", "swing": 20.0, "twist": [-15.0, 15.0] } },
+
+    { "name": "Arm.L",      "parent": "Shoulder.L", "offset": [-0.08, 0.0, 0.0],
+      "joint": { "type": "ball", "swing": 100.0, "twist": [-80.0, 80.0] } },
+    { "name": "Arm.R",      "parent": "Shoulder.R", "offset": [0.08, 0.0, 0.0],
+      "joint": { "type": "ball", "swing": 100.0, "twist": [-80.0, 80.0] } },
+
+    { "name": "Forearm.L",  "parent": "Arm.L",      "offset": [-0.15, 0.0, 0.0],
+      "joint": { "type": "hinge", "axis": [0.0, 0.0, 1.0], "range": [0.0, 150.0] } },
+    { "name": "Forearm.R",  "parent": "Arm.R",      "offset": [0.15, 0.0, 0.0],
+      "joint": { "type": "hinge", "axis": [0.0, 0.0, 1.0], "range": [-150.0, 0.0] } },
+
+    { "name": "Hand.L",     "parent": "Forearm.L",  "offset": [-0.14, 0.0, 0.0],
+      "joint": { "type": "ball", "swing": 60.0, "twist": [-80.0, 80.0] },
+      "roles": ["end_effector", "grip"] },
+    { "name": "Hand.R",     "parent": "Forearm.R",  "offset": [0.14, 0.0, 0.0],
+      "joint": { "type": "ball", "swing": 60.0, "twist": [-80.0, 80.0] },
+      "roles": ["end_effector", "grip"] },
+
+    { "name": "Leg.L",      "parent": "Hips",       "offset": [-0.08, -0.15, 0.0],
+      "joint": { "type": "ball", "swing": 90.0, "twist": [-40.0, 40.0] },
+      "load_bearing": true },
+    { "name": "Leg.R",      "parent": "Hips",       "offset": [0.08, -0.15, 0.0],
+      "joint": { "type": "ball", "swing": 90.0, "twist": [-40.0, 40.0] },
+      "load_bearing": true },
+
+    { "name": "Shin.L",     "parent": "Leg.L",      "offset": [0.0, -0.18, 0.0],
+      "joint": { "type": "hinge", "axis": [1.0, 0.0, 0.0], "range": [-150.0, 0.0] },
+      "load_bearing": true },
+    { "name": "Shin.R",     "parent": "Leg.R",      "offset": [0.0, -0.18, 0.0],
+      "joint": { "type": "hinge", "axis": [1.0, 0.0, 0.0], "range": [-150.0, 0.0] },
+      "load_bearing": true },
+
+    { "name": "Foot.L",     "parent": "Shin.L",     "offset": [0.0, -0.17, 0.0],
+      "joint": { "type": "ball", "swing": 40.0, "twist": [-20.0, 20.0] },
+      "load_bearing": true, "roles": ["end_effector", "ground_contact"] },
+    { "name": "Foot.R",     "parent": "Shin.R",     "offset": [0.0, -0.17, 0.0],
+      "joint": { "type": "ball", "swing": 40.0, "twist": [-20.0, 20.0] },
+      "load_bearing": true, "roles": ["end_effector", "ground_contact"] }
+  ],
+
+  "symmetry": {
+    "Shoulder.L": "Shoulder.R",
+    "Arm.L": "Arm.R",
+    "Forearm.L": "Forearm.R",
+    "Hand.L": "Hand.R",
+    "Leg.L": "Leg.R",
+    "Shin.L": "Shin.R",
+    "Foot.L": "Foot.R"
+  },
+
+  "contacts": [
+    { "name": "heel_l", "node": "Foot.L", "point": [0.0, -0.02, 0.05], "kind": "ground" },
+    { "name": "toe_l",  "node": "Foot.L", "point": [0.0, -0.02, -0.11], "kind": "ground" },
+    { "name": "heel_r", "node": "Foot.R", "point": [0.0, -0.02, 0.05], "kind": "ground" },
+    { "name": "toe_r",  "node": "Foot.R", "point": [0.0, -0.02, -0.11], "kind": "ground" },
+    { "name": "grip_l", "node": "Hand.L", "point": [-0.04, 0.0, 0.0], "kind": "grip" },
+    { "name": "grip_r", "node": "Hand.R", "point": [0.04, 0.0, 0.0], "kind": "grip" }
+  ],
+
+  "mass_distribution": {
+    "Hips": 0.14, "Spine": 0.14, "Chest": 0.18,
+    "Arm.L": 0.03, "Arm.R": 0.03, "Forearm.L": 0.02, "Forearm.R": 0.02,
+    "Hand.L": 0.01, "Hand.R": 0.01,
+    "Leg.L": 0.11, "Leg.R": 0.11, "Shin.L": 0.05, "Shin.R": 0.05,
+    "Foot.L": 0.015, "Foot.R": 0.015
+  }
+}

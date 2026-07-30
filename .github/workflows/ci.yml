@@ -24,3 +24,35 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+  # spar/ ist der engine-agnostische Fighter-Core. Eigener Job mit minimalen
+  # Abhaengigkeiten: kein mediapipe, kein Blender, kein PySide6. Schlaegt dieser Job
+  # wegen einer fehlenden SWIFT-Abhaengigkeit fehl, ist die Selbstenthaltung verletzt
+  # und `git subtree split -P spar` waere nicht mehr verlustfrei.
+  spar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r spar/requirements-dev.txt
+
+      - name: Run tests
+        working-directory: spar/ref_py
+        run: pytest tests -v --tb=short
+
+      - name: Gold-Clip end-to-end
+        working-directory: spar/ref_py
+        run: |
+          python -m spar.cli rigs
+          python -m spar.cli build-gold -o build
+          python -m spar.cli validate build/jab.glb
+          python -m spar.cli check build/jab.glb
+          python -m spar.cli render build/jab.glb --baked build/jab.baked.json -o build/frames

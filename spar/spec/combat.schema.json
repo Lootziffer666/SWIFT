@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swift.local/spec/combat.schema.json",
+  "title": "fcd/1",
+  "description": "Kampfdaten zu einem glTF-Clip. Referenziert Nodes und Animationen per Name und haelt keine Geometrie. Autoren-Format: menschenlesbar, node-relativ, editierbar. Die Runtime liest fcd-baked/1, nicht dieses.",
+  "type": "object",
+  "required": ["schema", "clip", "animation", "fps", "frame_count", "frames"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "fcd/1" },
+    "clip": { "type": "string", "description": "Dateiname der .glb, relativ zu dieser Datei" },
+    "animation": { "type": "string", "description": "Name der glTF-Animation im Clip" },
+    "fps": { "type": "integer", "minimum": 1 },
+    "frame_count": { "type": "integer", "minimum": 1 },
+
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "z.B. attack, punch, standing, light"
+    },
+
+    "frames": {
+      "type": "array",
+      "description": "Per-Frame-Eventspur. DAS ist die Wahrheit. startup/active/recovery sind eine abgeleitete Ansicht (siehe derive_phases), nicht die Quelle - sonst lassen sich Moves mit mehreren Trefferphasen nicht abbilden.",
+      "items": {
+        "type": "object",
+        "required": ["frame"],
+        "additionalProperties": false,
+        "properties": {
+          "frame": { "type": "integer", "minimum": 0 },
+          "flags": {
+            "type": "array",
+            "items": { "enum": ["grounded", "airborne", "armor", "invuln", "throw", "projectile"] }
+          },
+          "hit": { "type": "array", "items": { "$ref": "#/$defs/box" } },
+          "hurt": { "type": "array", "items": { "$ref": "#/$defs/box" } },
+          "cancel": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "In welche Tags dieser Frame abgebrochen werden darf"
+          },
+          "move": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 3,
+            "maxItems": 3,
+            "description": "Gameplay-Root-Motion dieses Frames in Metern. Getrennt von der visuellen Root-Bewegung im glTF - sonst laeuft die Figur optisch vor, waehrend ihre Kollisionsposition stehen bleibt."
+          }
+        }
+      }
+    },
+
+    "on_hit": { "$ref": "#/$defs/impact" },
+    "on_block": { "$ref": "#/$defs/impact" }
+  },
+
+  "$defs": {
+    "box": {
+      "type": "object",
+      "required": ["node", "min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "type": "string",
+          "description": "glTF-Node-Name aus dem kanonischen Rig. Die Box liegt im lokalen Raum dieses Nodes."
+        },
+        "min": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "max": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+        "id": { "type": "string", "description": "Optional, fuer Mehrfachtreffer-Bookkeeping" }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "damage": { "type": "integer", "minimum": 0, "default": 0 },
+        "hitstun": { "type": "integer", "minimum": 0, "default": 0 },
+        "blockstun": { "type": "integer", "minimum": 0, "default": 0 },
+        "pushback": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "In Metern, entlang der Blickrichtung des Angreifers"
+        }
+      }
+    }
+  }
+}

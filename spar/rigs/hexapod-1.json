@@ -1,0 +1,558 @@
+{
+  "schema": "spar-rig/1",
+  "id": "hexapod/1",
+  "name": "Six-legged Arthropod",
+  "units": "meters",
+  "up": "Y",
+  "forward": "-Z",
+  "root": "Thorax",
+  "reference_height": 0.35,
+  "bones": [
+    {
+      "name": "Thorax",
+      "parent": null,
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 180.0,
+        "twist": [
+          -180.0,
+          180.0
+        ]
+      },
+      "roles": [
+        "root"
+      ]
+    },
+    {
+      "name": "Abdomen",
+      "parent": "Thorax",
+      "offset": [
+        0.0,
+        0.0,
+        0.22
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 35.0,
+        "twist": [
+          -20.0,
+          20.0
+        ]
+      }
+    },
+    {
+      "name": "Head",
+      "parent": "Thorax",
+      "offset": [
+        0.0,
+        0.0,
+        -0.14
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 45.0,
+        "twist": [
+          -60.0,
+          60.0
+        ]
+      }
+    },
+    {
+      "name": "Coxa1.L",
+      "parent": "Thorax",
+      "offset": [
+        -0.09,
+        -0.01,
+        -0.1
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur1.L",
+      "parent": "Coxa1.L",
+      "offset": [
+        -0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          120.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia1.L",
+      "parent": "Femur1.L",
+      "offset": [
+        -0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -130.0,
+          0.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    },
+    {
+      "name": "Coxa1.R",
+      "parent": "Thorax",
+      "offset": [
+        0.09,
+        -0.01,
+        -0.1
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur1.R",
+      "parent": "Coxa1.R",
+      "offset": [
+        0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -120.0,
+          0.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia1.R",
+      "parent": "Femur1.R",
+      "offset": [
+        0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          130.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    },
+    {
+      "name": "Coxa2.L",
+      "parent": "Thorax",
+      "offset": [
+        -0.09,
+        -0.01,
+        0.0
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur2.L",
+      "parent": "Coxa2.L",
+      "offset": [
+        -0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          120.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia2.L",
+      "parent": "Femur2.L",
+      "offset": [
+        -0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -130.0,
+          0.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    },
+    {
+      "name": "Coxa2.R",
+      "parent": "Thorax",
+      "offset": [
+        0.09,
+        -0.01,
+        0.0
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur2.R",
+      "parent": "Coxa2.R",
+      "offset": [
+        0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -120.0,
+          0.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia2.R",
+      "parent": "Femur2.R",
+      "offset": [
+        0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          130.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    },
+    {
+      "name": "Coxa3.L",
+      "parent": "Thorax",
+      "offset": [
+        -0.09,
+        -0.01,
+        0.1
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur3.L",
+      "parent": "Coxa3.L",
+      "offset": [
+        -0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          120.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia3.L",
+      "parent": "Femur3.L",
+      "offset": [
+        -0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -130.0,
+          0.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    },
+    {
+      "name": "Coxa3.R",
+      "parent": "Thorax",
+      "offset": [
+        0.09,
+        -0.01,
+        0.1
+      ],
+      "joint": {
+        "type": "ball",
+        "swing": 55.0,
+        "twist": [
+          -25.0,
+          25.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Femur3.R",
+      "parent": "Coxa3.R",
+      "offset": [
+        0.16,
+        0.05,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          -120.0,
+          0.0
+        ]
+      },
+      "load_bearing": true
+    },
+    {
+      "name": "Tibia3.R",
+      "parent": "Femur3.R",
+      "offset": [
+        0.13,
+        -0.19,
+        0.0
+      ],
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "range": [
+          0.0,
+          130.0
+        ]
+      },
+      "load_bearing": true,
+      "roles": [
+        "end_effector",
+        "ground_contact"
+      ]
+    }
+  ],
+  "symmetry": {
+    "Coxa1.L": "Coxa1.R",
+    "Femur1.L": "Femur1.R",
+    "Tibia1.L": "Tibia1.R",
+    "Coxa2.L": "Coxa2.R",
+    "Femur2.L": "Femur2.R",
+    "Tibia2.L": "Tibia2.R",
+    "Coxa3.L": "Coxa3.R",
+    "Femur3.L": "Femur3.R",
+    "Tibia3.L": "Tibia3.R"
+  },
+  "contacts": [
+    {
+      "name": "foot1_l",
+      "node": "Tibia1.L",
+      "point": [
+        -0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    },
+    {
+      "name": "foot1_r",
+      "node": "Tibia1.R",
+      "point": [
+        0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    },
+    {
+      "name": "foot2_l",
+      "node": "Tibia2.L",
+      "point": [
+        -0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    },
+    {
+      "name": "foot2_r",
+      "node": "Tibia2.R",
+      "point": [
+        0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    },
+    {
+      "name": "foot3_l",
+      "node": "Tibia3.L",
+      "point": [
+        -0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    },
+    {
+      "name": "foot3_r",
+      "node": "Tibia3.R",
+      "point": [
+        0.02,
+        -0.02,
+        0.0
+      ],
+      "kind": "ground"
+    }
+  ],
+  "mass_distribution": {
+    "Thorax": 0.34,
+    "Abdomen": 0.26,
+    "Head": 0.08,
+    "Coxa1.L": 0.008,
+    "Femur1.L": 0.012,
+    "Tibia1.L": 0.012,
+    "Coxa1.R": 0.008,
+    "Femur1.R": 0.012,
+    "Tibia1.R": 0.012,
+    "Coxa2.L": 0.008,
+    "Femur2.L": 0.012,
+    "Tibia2.L": 0.012,
+    "Coxa2.R": 0.008,
+    "Femur2.R": 0.012,
+    "Tibia2.R": 0.012,
+    "Coxa3.L": 0.008,
+    "Femur3.L": 0.012,
+    "Tibia3.L": 0.012,
+    "Coxa3.R": 0.008,
+    "Femur3.R": 0.012,
+    "Tibia3.R": 0.012
+  }
+}
