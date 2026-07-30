@@ -56,3 +56,18 @@ jobs:
           python -m spar.cli validate build/jab.glb
           python -m spar.cli check build/jab.glb
           python -m spar.cli render build/jab.glb --baked build/jab.baked.json -o build/frames
+
+      - name: Conformance-Vektoren
+        working-directory: spar/ref_py
+        run: python -m spar.cli conformance
+
+      - name: Vektoren sind unveraendert
+        working-directory: spar/ref_py
+        # Neu erzeugte Vektoren, die vom eingecheckten Stand abweichen, sind eine
+        # Verhaltensaenderung und muessen bewusst committet werden. Ohne diesen
+        # Schritt koennte eine Regression durchrutschen, indem jemand die Vektoren
+        # neu generiert statt den Fehler zu beheben.
+        run: |
+          python -m spar.cli conformance --generate
+          git diff --exit-code -- ../conformance/vectors \
+            || { echo "::error::Vektoren weichen ab -- beabsichtigt? Dann committen."; exit 1; }

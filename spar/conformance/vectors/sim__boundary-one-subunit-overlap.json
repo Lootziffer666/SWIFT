@@ -1,0 +1,222 @@
+{
+  "comparison": "exact",
+  "expected": {
+    "events": [
+      {
+        "frame": 0,
+        "kind": "move_start",
+        "source": "A"
+      },
+      {
+        "damage": 7,
+        "frame": 1,
+        "kind": "hit",
+        "source": "A",
+        "target": "B"
+      },
+      {
+        "frame": 3,
+        "kind": "move_end",
+        "source": "A"
+      }
+    ],
+    "trace": [
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 0,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": 0
+        },
+        "b": {
+          "facing": -1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 0,
+          "stun": 0,
+          "x": 100
+        },
+        "frame": 1
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 1,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": 0
+        },
+        "b": {
+          "facing": -1,
+          "health": 93,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 3,
+          "stun": 5,
+          "x": 100
+        },
+        "frame": 2
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": "attack",
+          "move_frame": 2,
+          "name": "A",
+          "state": 2,
+          "stun": 0,
+          "x": 0
+        },
+        "b": {
+          "facing": -1,
+          "health": 93,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 3,
+          "stun": 4,
+          "x": 100
+        },
+        "frame": 3
+      },
+      {
+        "a": {
+          "facing": 1,
+          "health": 100,
+          "move": null,
+          "move_frame": 0,
+          "name": "A",
+          "state": 0,
+          "stun": 0,
+          "x": 0
+        },
+        "b": {
+          "facing": -1,
+          "health": 93,
+          "move": null,
+          "move_frame": 0,
+          "name": "B",
+          "state": 3,
+          "stun": 3,
+          "x": 100
+        },
+        "frame": 4
+      }
+    ]
+  },
+  "id": "sim/boundary-one-subunit-overlap",
+  "input": {
+    "fighters": [
+      {
+        "facing": 1,
+        "name": "A",
+        "x": 0
+      },
+      {
+        "facing": -1,
+        "name": "B",
+        "x": 100
+      }
+    ],
+    "log": [
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "moves": {
+      "attack": {
+        "fps": 60,
+        "frame_count": 3,
+        "frames": [
+          {
+            "frame": 0,
+            "hit": [],
+            "hurt": []
+          },
+          {
+            "frame": 1,
+            "hit": [
+              {
+                "id": "probe",
+                "max": [
+                  56,
+                  100,
+                  10
+                ],
+                "min": [
+                  0,
+                  0,
+                  -10
+                ]
+              }
+            ],
+            "hurt": []
+          },
+          {
+            "frame": 2,
+            "hit": [],
+            "hurt": []
+          }
+        ],
+        "on_block": {
+          "blockstun": 3,
+          "damage": 0,
+          "hitstun": 0,
+          "pushback": [
+            0,
+            0,
+            0
+          ]
+        },
+        "on_hit": {
+          "blockstun": 0,
+          "damage": 7,
+          "hitstun": 5,
+          "pushback": [
+            0,
+            0,
+            0
+          ]
+        },
+        "schema": "fcd-baked/1",
+        "tags": [
+          "attack"
+        ],
+        "unit_scale": 256
+      }
+    },
+    "rules": {
+      "max_health": 100,
+      "push_apart": 0,
+      "stage_max": 1536,
+      "stage_min": -1536,
+      "walk_speed": 6
+    }
+  },
+  "note": "Hitbox-Kante bei 56, Hurtbox-Kante bei 55. Treffer erwartet: True. Beruehrung allein reicht nicht -- die Ueberlappung ist strikt.",
+  "tier": "sim"
+}

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from . import bake as bake_mod
+from . import conformance as conf
 from . import cue, gold, viewer
 from .combat import CombatData, derive_phases
 from .glb import read_clip
@@ -87,6 +88,19 @@ def cmd_validate(args) -> int:
     return 0
 
 
+def cmd_conformance(args) -> int:
+    if args.generate:
+        written = conf.generate()
+        print(f"  {len(written)} Vektoren erzeugt")
+        print("  Achtung: geaenderte Vektoren sind eine Verhaltensaenderung, kein Aufraeumen.")
+        return 0
+    passed, total, failures = conf.run()
+    for m in failures:
+        print(f"  FAIL {m}")
+    print(f"  {passed}/{total} Vektoren bestanden")
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="spar", description="SPAR Referenz-Implementierung")
     p.add_argument("--rig", default="biped/1", help="Rig-ID aus spar/rigs (default: biped/1)")
@@ -116,6 +130,10 @@ def main(argv: list[str] | None = None) -> int:
     ph = sub.add_parser("phases", help="Startup/Active/Recovery ableiten")
     ph.add_argument("combat")
     ph.set_defaults(fn=cmd_phases)
+
+    cf = sub.add_parser("conformance", help="Conformance-Vektoren pruefen oder erzeugen")
+    cf.add_argument("--generate", action="store_true", help="Vektoren neu erzeugen")
+    cf.set_defaults(fn=cmd_conformance)
 
     args = p.parse_args(argv)
     return args.fn(args)
