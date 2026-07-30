@@ -417,8 +417,29 @@ def _level_end_bone(
     pose = fk.solve(rig, clip, frame, include_root_translation=True)
     current = [pose[node].local_to_world(p) for p in locals_]
 
-    have = quat.sub(current[-1], current[0])
-    want = quat.sub(targets[-1], targets[0])
+    # Die Ausrichtung wird an den beiden am weitesten auseinanderliegenden Punkten
+    # abgelesen, nicht am ersten und letzten der Liste. Bei Ferse und Zehe ist das
+    # dasselbe; sobald ein Bone drei Kontakte traegt, haengt "erster und letzter"
+    # aber an der Reihenfolge, in der die Spannen zufaellig im Plan stehen -- und
+    # ein zweiter Plan mit denselben Kontakten in anderer Reihenfolge ergaebe eine
+    # andere Pose. Das laengste Paar ist von der Reihenfolge unabhaengig und zugleich
+    # der stabilste Hebel.
+    #
+    # Es bleibt eine Naeherung: drei und mehr Punkte definieren eine Flaeche, und die
+    # richtige Antwort waere eine Ausgleichsebene. Kein mitgeliefertes Rig hat mehr als
+    # zwei Kontakte je Bone, deshalb steht das hier als Grenze und nicht als Code.
+    pairs = [
+        (quat.length(quat.sub(a, b)), i, j)
+        for i, a in enumerate(targets)
+        for j, b in enumerate(targets)
+        if i < j
+    ]
+    if not pairs:
+        return
+    _, i, j = max(pairs)
+
+    have = quat.sub(current[j], current[i])
+    want = quat.sub(targets[j], targets[i])
     if quat.length(have) < 1e-6 or quat.length(want) < 1e-6:
         return
 
