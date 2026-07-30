@@ -18,9 +18,21 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        # Abgeleitet aus requirements.txt statt danebengeschrieben. Eine handgepflegte
+        # zweite Liste laeuft auseinander, und zwar lautlos: zuerst fehlten fastapi und
+        # python-multipart, dann httpx, dann scipy -- jedes Mal erst im roten Lauf
+        # bemerkt. Was hier abweicht, weicht aus einem Grund ab:
+        #   PySide6/pytest-qt  -- der Runner hat kein Display; die GUI-Tests
+        #                         ueberspringen sich selbst, wenn der Import fehlt.
+        #   opencv-python      -- headless-Variante, gleiche API ohne GUI-Bindings.
+        # Alles andere kommt automatisch mit, sobald es in requirements.txt steht.
         run: |
           pip install --upgrade pip
-          pip install pillow opencv-python-headless mediapipe anthropic numpy pytest fastapi httpx python-multipart
+          grep -v -E '^(PySide6|pytest-qt|opencv-python)\b' requirements.txt > /tmp/ci-requirements.txt
+          echo "opencv-python-headless>=4.8.0" >> /tmp/ci-requirements.txt
+          echo "httpx" >> /tmp/ci-requirements.txt
+          cat /tmp/ci-requirements.txt
+          pip install -r /tmp/ci-requirements.txt
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
@@ -56,6 +68,18 @@ jobs:
           python -m spar.cli validate build/jab.glb
           python -m spar.cli check build/jab.glb
           python -m spar.cli render build/jab.glb --baked build/jab.baked.json -o build/frames
+
+      - name: Kontaktplan und Retargeting
+        working-directory: spar/ref_py
+        # Belegt die Kernaussage von L3 end-to-end: Kontakte sind das Invariante.
+        # `retarget` gibt ungleich null zurueck, sobald CUE auf dem Ergebnis einen
+        # Fehler meldet -- ein Fuss, der den Boden verliert, faellt hier auf.
+        run: |
+          python -m spar.cli contacts build/jab.glb -o build/jab.contacts.json
+          python -m spar.cli retarget build/jab.glb --to biped/1-stocky \
+            --contacts build/jab.contacts.json -o build/jab_stocky.glb
+          python -m spar.cli --rig biped/1-stocky check build/jab_stocky.glb \
+            --contacts build/jab.contacts.json
 
       - name: Conformance-Vektoren
         working-directory: spar/ref_py

@@ -47,12 +47,17 @@ Daten abspielt, muss weder glTF lesen noch Forward Kinematics rechnen.
 | `fk` | toleriert | Forward Kinematics, Knochenlängen | Renderer, Bake-Werkzeuge |
 | `mirror` | toleriert | Spiegelung von Clips und Boxen | Bake-Werkzeuge |
 | `bake` | exakt | Box-Bake in Fixed-Point | Bake-Werkzeuge |
+| `contact` | gemischt | Kontaktplan, Retargeting | Bake-Werkzeuge |
 
 **Rollen:**
 
 - *Runtime* (Engine-Adapter, spielt gebakene Clips ab) → `fixed`, `sim`
 - *Werkzeug* (autoriert, baked, spiegelt) → alle Stufen
 - *Betrachter* (rendert nur) → `fixed`, `fk`
+
+`contact` ist gemischt, weil beide Hälften verschieden hart sind: Intervallarithmetik und
+Herleitung des Plans werden **exakt** verglichen, die IK-Ergebnisse **toleriert** — sie sind
+Gleitkomma und laufen zur Bake-Zeit, nie im Gameplay-Pfad.
 
 ## Exakt oder toleriert
 
@@ -98,6 +103,24 @@ Rotation sein.
 Vorwärtsdurchlauf genügt für FK. Die Rig-*Datei* darf ihre Bones beliebig anordnen — der
 Loader sortiert.
 → `fk/biped-1`, `fk/hexapod-1`
+
+**Kontaktspannen sind inklusiv.** `[4, 4]` ist genau ein Frame. Wer `to` exklusiv liest,
+verliert je Spanne den letzten Frame — am Absprung genau den, der die Bewegung trägt.
+→ `contact/spans-are-inclusive`
+
+**Die Root verschiebt sich um das Minimum, vorzeichenbehaftet, mit Reichweite.** Drei
+Fehler in einem Satz, jeder für sich plausibel: der *Mittelwert* lässt den tiefsten Kontakt
+unerreichbar; auf negative Werte *geklemmt* bleibt ein langbeinigeres Ziel in der Hocke; nur
+die *Höhendifferenz* zu rechnen lässt bei kürzeren Gliedmaßen genau die fehlende Reichweite
+als Schweben stehen.
+→ `contact/root-shift-is-minimum`, `contact/retarget-preserves-planted`,
+  `contact/retarget-hexapod`
+
+**Die Ruhelage einer IK-Kette darf gebeugt sein.** Beim Biped ruht das Bein gerade —
+Schienbein und Fuß zeigen beide senkrecht nach unten — und ein Löser, der Geradheit
+voraussetzt, kommt damit durch. Ein Insektenbein fällt sofort auf. Deshalb wird mit dem
+*Innenwinkel* am Mittelgelenk gerechnet und mit der Differenz zu dessen Ruhewinkel.
+→ `contact/retarget-hexapod`
 
 ## Ausführen
 

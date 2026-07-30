@@ -375,6 +375,37 @@ def cmd_render(args, reporter: Reporter):
             reporter.say(f"  ⚠️ Base sprite sheet not found: {base_sheet_path}")
         else:
             base_sheet = Image.open(base_sheet_path).convert("RGBA")
+
+            # Relief comes from the render's own passes. Without them the grime and
+            # wear channels stay silent rather than being guessed from luminance —
+            # a painted stripe and a real groove look identical to a colour gradient.
+            # core/video_to_sprite/ never produces these, so their absence is normal.
+            import numpy as _np
+
+            stem = base_sheet_path[:-4]
+            depth_arr = normal_arr = None
+            depth_sheet_path = stem + "_depth.png"
+            normal_sheet_path = stem + "_normal.png"
+            if os.path.exists(depth_sheet_path):
+                depth_img = Image.open(depth_sheet_path).convert("L")
+                if depth_img.size == base_sheet.size:
+                    depth_arr = _np.asarray(depth_img, dtype=_np.float32)
+                else:
+                    reporter.say(
+                        f"  ⚠️ Depth sheet size {depth_img.size} != sheet "
+                        f"{base_sheet.size}; ignoring it"
+                    )
+            if depth_arr is not None and os.path.exists(normal_sheet_path):
+                normal_img = Image.open(normal_sheet_path).convert("RGB")
+                if normal_img.size == base_sheet.size:
+                    normal_arr = _np.asarray(normal_img, dtype=_np.float32)
+
+            if depth_arr is None:
+                reporter.say(
+                    "  ℹ️ No depth pass — variants use tone and value only "
+                    "(render with --depth-pass for geometric grime and wear)"
+                )
+
             ws_manifest = {}
 
             for entry in world_states_list:
@@ -394,7 +425,9 @@ def cmd_render(args, reporter: Reporter):
                     reporter.say(f"  ⚠️ Unknown world state: {state_name} (skip)")
                     continue
 
-                variant_sheet = apply_world_state(base_sheet, state_name, intensity)
+                variant_sheet = apply_world_state(
+                    base_sheet, state_name, intensity, depth=depth_arr, normal=normal_arr
+                )
                 variant_path = out.replace('.png', f'_{state_name}.png')
                 variant_sheet.save(variant_path, 'PNG')
                 ws_manifest[state_name] = WorldStateRef(

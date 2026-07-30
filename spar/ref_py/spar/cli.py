@@ -9,9 +9,12 @@ from pathlib import Path
 
 from . import bake as bake_mod
 from . import conformance as conf
+from . import contact as contact_mod
 from . import cue, gold, viewer
+from . import retarget as retarget_mod
 from .combat import CombatData, derive_phases
-from .glb import read_clip
+from .contact import ContactSchedule
+from .glb import read_clip, write_clip
 from .rig import Rig, RigError, load_builtin
 
 
@@ -63,9 +66,48 @@ def cmd_render(args) -> int:
 def cmd_check(args) -> int:
     rig = _rig(args)
     clip = read_clip(args.clip, rig)
-    findings = cue.run_all(rig, clip)
+    schedule = ContactSchedule.load(args.contacts) if getattr(args, "contacts", None) else None
+    findings = cue.run_all(rig, clip, schedule)
     print(cue.summarize(findings))
     return 1 if any(f.severity == "error" for f in findings) else 0
+
+
+def cmd_contacts(args) -> int:
+    rig = _rig(args)
+    clip = read_clip(args.clip, rig)
+    schedule = contact_mod.derive(rig, clip, ground_y=args.ground_y)
+    if args.out:
+        print(f"  {schedule.save(args.out)}")
+    else:
+        print(json.dumps(schedule.to_dict(), indent=2))
+    print(
+        f"  {len(schedule.spans)} Spannen ueber {len(schedule.sites())} Stellen -- "
+        "Vorschlag. Pruefen, committen; ab dann ist die Datei die Wahrheit."
+    )
+    return 0
+
+
+def cmd_retarget(args) -> int:
+    source = _rig(args)
+    target = load_builtin(args.to)
+    clip = read_clip(args.clip, source)
+    schedule = (
+        ContactSchedule.load(args.contacts)
+        if args.contacts
+        else contact_mod.derive(source, clip, ground_y=args.ground_y)
+    )
+    result = retarget_mod.retarget(source, clip, schedule, target)
+
+    findings = cue.run_all(target, result.clip, schedule)
+    errors = [f for f in findings if f.severity == "error"]
+    shift = result.root_shift
+    print(f"  {source.id} -> {target.id}, {clip.frame_count} Frames")
+    print(f"  Root-Verschiebung {min(shift):+.4f} .. {max(shift):+.4f} m")
+    print(f"  {cue.summarize(findings)}")
+    if args.out:
+        write_clip(args.out, result.clip, target)
+        print(f"  {args.out}")
+    return 1 if errors else 0
 
 
 def cmd_phases(args) -> int:
@@ -119,7 +161,22 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("-o", "--out", default="build/frames")
     r.set_defaults(fn=cmd_render)
 
+    ct = sub.add_parser("contacts", help="Kontaktplan aus einem Clip vorschlagen")
+    ct.add_argument("clip")
+    ct.add_argument("-o", "--out", help="Zieldatei; ohne sie nach stdout")
+    ct.add_argument("--ground-y", type=float, default=0.0, dest="ground_y")
+    ct.set_defaults(fn=cmd_contacts)
+
+    rt = sub.add_parser("retarget", help="Clip auf ein anderes Rig uebertragen")
+    rt.add_argument("clip")
+    rt.add_argument("--to", required=True, help="Ziel-Rig-ID, z.B. biped/1-stocky")
+    rt.add_argument("--contacts", help="Kontaktplan; ohne ihn wird einer hergeleitet")
+    rt.add_argument("--ground-y", type=float, default=0.0, dest="ground_y")
+    rt.add_argument("-o", "--out", help="Ziel-.glb")
+    rt.set_defaults(fn=cmd_retarget)
+
     c = sub.add_parser("check", help="CUE-Pruefungen auf einem Clip")
+    c.add_argument("--contacts", help="Kontaktplan; macht aus dem Raten eine Aussage")
     c.add_argument("clip")
     c.set_defaults(fn=cmd_check)
 

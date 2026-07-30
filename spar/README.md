@@ -14,7 +14,7 @@ Nachweis — siehe *Stand* unten.
 |---|---|---|---|
 | L1 | Anatomiegraph | Was ein Körper *ist*: Gelenke, Segmente, Grenzen, Kontakte | steht |
 | L2 | Posegraph | Was er über die Zeit *tut*: Rotation je Gelenk je Frame | steht |
-| L3 | Kontaktgraph | Woran er *koppelt*: Boden, Griff, Treffer | Kontaktpunkte definiert, Retargeting offen |
+| L3 | Kontaktgraph | Woran er *koppelt*: Boden, Griff, Treffer | steht — Kontaktplan, kontakt-erhaltendes Retargeting |
 | L4 | Ausdrucksgraph | Gesicht, eine Auflösungsstufe feiner | offen |
 | L5 | Intent | *Warum* es passiert — zuerst als Beschriftung, nicht als Erzeuger | offen |
 | L6 | CUE-Prüfung | Stimmt das? | steht |
@@ -81,12 +81,20 @@ ref_py/   Referenz-Implementierung: engine-frei, kein Renderer im Gameplay-Pfad
 cd spar/ref_py
 pip install -r ../requirements-dev.txt
 
-pytest tests                                    # 24 Tests, ohne SWIFT-Abhängigkeiten
+pytest tests                                    # ohne SWIFT-Abhängigkeiten
 python -m spar.cli rigs                         # mitgelieferte Anatomien
 python -m spar.cli build-gold -o build          # Gold-Clip: glb + combat + bake
 python -m spar.cli validate build/jab.glb       # glTF-Profil prüfen
 python -m spar.cli check build/jab.glb          # CUE: Längen, Grenzen, Rutschen, Balance
 python -m spar.cli render build/jab.glb --baked build/jab.baked.json -o build/frames
+python -m spar.cli conformance                  # 19 Vektoren, nach Rolle gestaffelt
+
+# L3: Kontakte als Invariante
+python -m spar.cli contacts build/jab.glb -o build/jab.contacts.json
+python -m spar.cli retarget build/jab.glb --to biped/1-stocky \
+    --contacts build/jab.contacts.json -o build/jab_stocky.glb
+python -m spar.cli --rig biped/1-stocky check build/jab_stocky.glb \
+    --contacts build/jab.contacts.json
 ```
 
 Der Renderer ist bewusst hässlich. Sein Zweck ist der Nachweis, dass das Format **ohne
@@ -96,11 +104,17 @@ engine-agnostische Pipeline, sondern eine mit einem bequemen Betrachter.
 ## Stand
 
 Fertig: L1 (Rig-Format, zwei Anatomien), L2 (glTF-Profil, Lesen/Schreiben, FK, Mirror-Bake),
-L6 (Längen, Gelenkgrenzen per Swing-Twist, Fußrutschen, Schwerpunkt über Stützfläche),
-Fixed-Point-Bake, deterministische Simulation, Headless-Viewer, Gold-Clip.
+L3 (Kontaktplan `spar-contact/1`, kontakt-erhaltendes Retargeting per Zwei-Knochen-IK),
+L6 (Längen, Gelenkgrenzen per Swing-Twist, Kontaktdrift, Schwerpunkt über Stützfläche),
+Fixed-Point-Bake, deterministische Simulation, Headless-Viewer, Gold-Clip,
+19 Conformance-Vektoren über sechs Stufen mit Meta-Tests.
 
-Offen: Conformance-Vektoren, TypeScript-Implementierung, PlayCanvas-Adapter,
-Kontakt-erhaltendes Retargeting, Extraktion aus Video, Editor, L4, L5.
+Retargeting deckt **gleiche Topologie, andere Proportionen** ab. Übertragung zwischen
+verschiedenen Topologien braucht eine Gliedmaßen-Zuordnung und ist ein eigenes Vorhaben;
+der Sechsbeiner läuft hier nur als Generalitätsnachweis durch denselben Löser.
+
+Offen: TypeScript-Implementierung, PlayCanvas-Adapter, Durchdringungsprüfung (braucht
+Volumen, nicht nur Kontaktpunkte), Extraktion aus Video, Editor, L4, L5.
 
 **Noch nicht bewiesen:** Bis die zweite Implementierung dieselben Vektoren besteht, ist
 „engine-agnostisch" eine Konstruktionsabsicht und keine geprüfte Eigenschaft. Abweichung

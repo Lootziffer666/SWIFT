@@ -126,6 +126,17 @@ def remap_world_state(
             tint_img = Image.new("RGB", rgb.size, state.tint)
             rgb = Image.blend(rgb, tint_img, amt)
 
+    # Same ceiling the world-state recipes answer to. A warmth shift adds red and
+    # removes blue, which manufactures saturation out of a neutral surface — without a
+    # shared limit the two variant paths drift apart and a world assembled from both
+    # stops looking like one place.
+    import numpy as _np
+
+    from .world_states import MAX_SATURATION, saturation_guard
+
+    guarded = saturation_guard(_np.asarray(rgb, dtype=_np.float32), MAX_SATURATION)
+    rgb = Image.fromarray(_np.clip(guarded, 0, 255).astype(_np.uint8), "RGB")
+
     out = Image.new("RGBA", rgb.size)
     out.paste(rgb, (0, 0))
     out.putalpha(img.split()[3])

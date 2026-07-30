@@ -33,6 +33,7 @@ TIERS = {
     "mirror": "Spiegelung. Toleriert. Pflicht fuer Bake-Werkzeuge.",
     "bake": "Box-Bake in Fixed-Point. Exakt. Pflicht fuer Bake-Werkzeuge.",
     "sim": "Deterministische Simulation. Exakt. Pflicht fuer jede spielende Rolle.",
+    "contact": "Kontaktplan und Retargeting. Gemischt. Pflicht fuer Bake-Werkzeuge.",
 }
 
 FLOAT_TOLERANCE = 1e-6
@@ -403,13 +404,176 @@ def _vec_sim(rig: Rig) -> list[dict]:
     return out
 
 
+def _rest_pose_clip(r: Rig, frames: int = 3):
+    from .glb import Clip
+
+    return Clip(
+        name="rest",
+        fps=30,
+        frame_count=frames,
+        rig_id=r.id,
+        rotations={b.name: [quat.IDENTITY] * frames for b in r},
+        root_translation=[(0.0, 0.0, 0.0)] * frames,
+    )
+
+
+def _vec_contact(rig: Rig) -> list[dict]:
+    """Kontaktplan, Root-Verschiebung und Retargeting."""
+    from . import contact as contact_mod
+    from . import gold, retarget
+
+    out: list[dict] = []
+
+    # -- Intervallkonvention ------------------------------------------------
+    out.append(
+        {
+            "id": "contact/spans-are-inclusive",
+            "tier": "contact",
+            "comparison": "exact",
+            "note": (
+                "'to' ist inklusiv. Eine Spanne [4, 4] ist genau ein Frame. Wer sie "
+                "exklusiv liest, verliert je Spanne den letzten Frame -- am Absprung "
+                "genau den, der die Bewegung traegt. Ohne festgeschriebene Konvention "
+                "waehlt eine Implementierung das eine und die naechste das andere."
+            ),
+            "input": {
+                "frame_count": 8,
+                "spans": [
+                    {"site": "heel_l", "kind": "planted", "from": 0, "to": 3},
+                    {"site": "toe_l", "kind": "planted", "from": 4, "to": 4},
+                ],
+            },
+            "expected": {
+                "engaged_per_frame": [
+                    ["heel_l"], ["heel_l"], ["heel_l"], ["heel_l"],
+                    ["toe_l"], [], [], [],
+                ],
+                "frame_counts": {"heel_l": 4, "toe_l": 1},
+            },
+        }
+    )
+
+    # -- Herleitung ist reproduzierbar --------------------------------------
+    clip = gold.build_clip(rig)
+    schedule = contact_mod.derive(rig, clip)
+    out.append(
+        {
+            "id": "contact/derive-is-deterministic",
+            "tier": "contact",
+            "comparison": "exact",
+            "note": (
+                "Derselbe Clip ergibt denselben Plan. Die Herleitung ist eine "
+                "Heuristik; sie wird einmal gerechnet, eingecheckt und ist ab dann "
+                "Wahrheit. Rechnet jede Implementierung sie neu und kommt anders "
+                "heraus, uebertraegt das Retargeting eine andere Invariante."
+            ),
+            "input": {
+                "rig": rig.id,
+                "clip_name": clip.name,
+                "clip": _clip_payload(clip),
+                "ground_y": 0.0,
+                "threshold": contact_mod.DEFAULT_GROUND_THRESHOLD,
+            },
+            "expected": schedule.to_dict(),
+        }
+    )
+
+    # -- Root-Verschiebung ist das Minimum ----------------------------------
+    stocky = load_builtin("biped/1-stocky")
+    result = retarget.retarget(rig, clip, schedule, stocky)
+    out.append(
+        {
+            "id": "contact/root-shift-is-minimum",
+            "tier": "contact",
+            "comparison": "approx",
+            "tolerance": 1e-6,
+            "note": (
+                "Die Root verschiebt sich um das Minimum ueber alle eingerasteten "
+                "Kontakte, nicht um den Mittelwert -- sonst bleibt der tiefste "
+                "unerreichbar und sein Bein ueberstreckt. Vorzeichenbehaftet: ein "
+                "langbeinigeres Ziel hebt den Koerper, statt ihn zu senken. Und die "
+                "Reichweite geht mit ein, nicht nur die Hoehendifferenz."
+            ),
+            "input": {
+                "source_rig": rig.id,
+                "target_rig": stocky.id,
+                "clip": _clip_payload(clip),
+                "schedule": schedule.to_dict(),
+                "want": "root_shift",
+            },
+            "expected": {"root_shift": result.root_shift},
+        }
+    )
+
+    # -- Kontakte bleiben stehen --------------------------------------------
+    for source_id, target_id, ground_y, name in (
+        ("biped/1", "biped/1-stocky", 0.0, "contact/retarget-preserves-planted"),
+        ("hexapod/1", "hexapod/1-tall", -0.17, "contact/retarget-hexapod"),
+    ):
+        src = load_builtin(source_id)
+        dst = load_builtin(target_id)
+        c = gold.build_clip(src) if source_id == "biped/1" else _rest_pose_clip(src)
+        sched = contact_mod.derive(src, c, ground_y=ground_y)
+        res = retarget.retarget(src, c, sched, dst)
+
+        positions = []
+        for frame in range(c.frame_count):
+            pose = fk.solve(dst, res.clip, frame, include_root_translation=True)
+            by = {x.name: x for x in dst.contacts}
+            positions.append(
+                {
+                    s: list(pose[by[s].node].local_to_world(by[s].point))
+                    for s in sorted(sched.sites())
+                }
+            )
+
+        legs = len([x for x in src.contacts if x.kind == "ground"])
+        out.append(
+            {
+                "id": name,
+                "tier": "contact",
+                "comparison": "approx",
+                "tolerance": 1e-6,
+                "note": (
+                    f"Kontakte sind das Invariante, Gelenkwinkel das Verhandelbare. "
+                    f"{legs} Bodenkontakte, {source_id} -> {target_id}."
+                    + (
+                        " Sechs Beine durch denselben Loeser: er findet Ketten ueber "
+                        "die Hierarchie, nicht ueber Gliedmassennamen. Und die Ruhelage "
+                        "dieser Kette ist bereits gebeugt -- ein Loeser, der von einer "
+                        "geraden Ruhelage ausgeht, faellt genau hier auf."
+                        if "hexapod" in source_id
+                        else ""
+                    )
+                ),
+                "input": {
+                    "source_rig": src.id,
+                    "target_rig": dst.id,
+                    "clip": _clip_payload(c),
+                    "schedule": sched.to_dict(),
+                    "want": "contacts",
+                },
+                "expected": {"contacts": positions},
+            }
+        )
+
+    return out
+
+
 def generate(out_dir: str | Path | None = None) -> list[Path]:
     """Erzeugt alle Vektoren aus der Referenz-Implementierung."""
     out = Path(out_dir) if out_dir else VECTOR_DIR
     out.mkdir(parents=True, exist_ok=True)
     rig = load_builtin("biped/1")
 
-    vectors = _vec_fixed() + _vec_fk(rig) + _vec_mirror(rig) + _vec_bake(rig) + _vec_sim(rig)
+    vectors = (
+        _vec_fixed()
+        + _vec_fk(rig)
+        + _vec_mirror(rig)
+        + _vec_bake(rig)
+        + _vec_sim(rig)
+        + _vec_contact(rig)
+    )
 
     written = []
     for v in vectors:
@@ -508,6 +672,58 @@ def _solve_bake(inp: dict) -> dict:
     r = load_builtin(inp["rig"])
     clip = _clip_from_payload(inp["clip"], r.id)
     return {"baked": bake_mod.bake(r, clip, CombatData.from_dict(inp["combat"]))}
+
+
+@solver("contact")
+def _solve_contact(inp: dict) -> dict:
+    from . import contact as contact_mod
+    from . import retarget
+
+    # Reine Intervallarithmetik -- kein Rig, kein Clip, kein Loeser noetig.
+    if "spans" in inp:
+        schedule = contact_mod.ContactSchedule.from_dict(
+            {
+                "schema": contact_mod.SCHEMA,
+                "clip": "vector",
+                "rig": "biped/1",
+                "frame_count": inp["frame_count"],
+                "spans": inp["spans"],
+            }
+        )
+        return {
+            "engaged_per_frame": [
+                sorted(s.site for s in schedule.engaged_at(f))
+                for f in range(schedule.frame_count)
+            ],
+            "frame_counts": {s.site: s.frame_count for s in schedule.spans},
+        }
+
+    if "ground_y" in inp:
+        r = load_builtin(inp["rig"])
+        clip = _clip_from_payload(inp["clip"], r.id)
+        clip.name = inp["clip_name"]
+        return contact_mod.derive(
+            r, clip, ground_y=inp["ground_y"], threshold=inp["threshold"]
+        ).to_dict()
+
+    src = load_builtin(inp["source_rig"])
+    dst = load_builtin(inp["target_rig"])
+    clip = _clip_from_payload(inp["clip"], src.id)
+    schedule = contact_mod.ContactSchedule.from_dict(inp["schedule"])
+    result = retarget.retarget(src, clip, schedule, dst)
+
+    if inp["want"] == "root_shift":
+        return {"root_shift": result.root_shift}
+
+    by = {x.name: x for x in dst.contacts}
+    sites = sorted(schedule.sites())
+    positions = []
+    for frame in range(clip.frame_count):
+        pose = fk.solve(dst, result.clip, frame, include_root_translation=True)
+        positions.append(
+            {s: list(pose[by[s].node].local_to_world(by[s].point)) for s in sites}
+        )
+    return {"contacts": positions}
 
 
 @solver("sim")
