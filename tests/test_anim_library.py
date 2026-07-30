@@ -34,6 +34,16 @@ class TestDetectSource:
     def test_quaternius_ual_standard(self):
         assert _detect_source("/anims/UAL1_Standard.fbx") == "quaternius"
 
+    def test_metahuman_path(self):
+        assert _detect_source("/exports/metahumans/hero_walk.fbx") == "metahuman"
+
+    def test_metahuman_mh_prefix(self):
+        assert _detect_source("/anims/MH_Walk.fbx") == "metahuman"
+
+    def test_metahuman_beats_generic_unreal(self):
+        # ue5/metahumans-Pfade sind beides — MetaHuman ist die spezifischere Quelle
+        assert _detect_source("/ue5_project/metahumans/hero.fbx") == "metahuman"
+
 
 class TestHasRootMotion:
     def test_rm_suffix_true(self):

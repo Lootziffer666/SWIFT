@@ -514,7 +514,24 @@ Contract points ANVIL must honor:
 5. **Variant / world-state selection** — if ANVIL wants a palette variant or world-state
    look, it should point `image` at the variant/world-state PNG SWIFT produced
    (`hero_red.png`, `hero_dust.png`, …) while keeping the same `manifest` (frame layout
-   is identical across variants).
+   is identical across variants). Alternatively (SHADED v1.5.0+), pass the variant
+   sheets up front and switch at runtime without re-adding the actor:
+
+   ```js
+   const actor = window.SHADED.addActor({
+     image: 'hero.png', manifest,
+     emissiveImage: 'hero_emissive.png',          // --emissive-pass → additive glow,
+                                                  // scales with SHADED's dayNight/fog
+     worldStateImages: { dust: 'hero_dust.png', aging: 'hero_aging.png' }
+   });
+   actor.getWorldStates();      // manifest's worldStates keys, e.g. ['dust','aging']
+   actor.setWorldState('dust'); // swap to the dust variant sheet (same frame layout)
+   actor.setWorldState(null);   // back to the base sheet
+   ```
+
+   Like `depthImage`, the `emissiveImage`/world-state PNGs are **not** auto-loaded from
+   manifest paths — the caller passes them explicitly. `normalImage` is parsed by SHADED
+   but not yet rendered (reserved; Canvas-2D overlay has no lighting pass).
 
 > **Invariante 2 (Material Truth):** the actor is purely optical. It must not influence
 > SHADED's material classification or physics. SWIFT sets no world state; it only

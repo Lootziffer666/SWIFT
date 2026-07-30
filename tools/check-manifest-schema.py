@@ -53,13 +53,27 @@ def check_manifest(manifest_path: str) -> bool:
             print(f"❌ Animation {anim_name} missing frames or fps")
             return False
 
-    # v1.4.0 optional fields
-    if 'depthImage' in manifest:
-        print(f"✓ Depth image: {manifest['depthImage']}")
-    if 'depthFrameRects' in manifest:
-        depth_rects = manifest.get('depthFrameRects', {})
-        if len(depth_rects) != len(frame_rects):
-            print(f"⚠️ Depth frame count mismatch: {len(depth_rects)} vs {len(frame_rects)}")
+    # v1.4.0 optional fields (depth/normal/emissive passes share the frame layout)
+    for kind in ('depth', 'normal', 'emissive'):
+        img_key, rects_key = f'{kind}Image', f'{kind}FrameRects'
+        if img_key in manifest:
+            print(f"✓ {kind.capitalize()} image: {manifest[img_key]}")
+        if rects_key in manifest:
+            pass_rects = manifest.get(rects_key, {})
+            if len(pass_rects) != len(frame_rects):
+                print(f"⚠️ {kind.capitalize()} frame count mismatch: {len(pass_rects)} vs {len(frame_rects)}")
+
+    # worldStates (SHADED world-state hooks): each entry needs a name + intensity
+    world_states = manifest.get('worldStates', {})
+    if world_states:
+        if not isinstance(world_states, dict):
+            print(f"❌ worldStates must be a dict")
+            return False
+        for ws_name, ws in world_states.items():
+            if not isinstance(ws, dict) or 'name' not in ws:
+                print(f"❌ worldState {ws_name} missing name: {ws}")
+                return False
+        print(f"✓ World states: {', '.join(world_states)}")
 
     print(f"✓ Manifest v{version} schema valid")
     print(f"  - Frames: {len(frame_rects)}")

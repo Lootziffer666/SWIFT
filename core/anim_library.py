@@ -16,6 +16,7 @@ SOURCE_TYPES = {
     "mixamo":     "Mixamo",
     "kenney":     "Kenney",
     "quaternius": "Quaternius (CC0)",
+    "metahuman":  "MetaHuman (Epic)",
     "unreal":     "Unreal Engine",
     "mocap":      "Motion Capture",
     "unknown":    "Unknown",
@@ -38,6 +39,10 @@ def _detect_source(path: str) -> str:
     stem = Path(path).stem.lower()
     if stem.startswith("ual"):
         return "quaternius"
+    # MetaHuman-Exporte VOR der generischen Unreal-Erkennung prüfen —
+    # Pfade wie ue5/metahumans/hero.fbx sind beides, MetaHuman ist spezifischer.
+    if "metahuman" in lower or stem.startswith("mh_"):
+        return "metahuman"
     if "unreal" in lower or "ue4" in lower or "ue5" in lower:
         return "unreal"
     if "mocap" in lower or "capture" in lower:
