@@ -63,7 +63,10 @@ class CombatData:
 
     @classmethod
     def load(cls, path: str | Path) -> "CombatData":
-        data = json.loads(Path(path).read_text())
+        return cls.from_dict(json.loads(Path(path).read_text()))
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CombatData":
         if data.get("schema") != "fcd/1":
             raise ValueError(f"Erwartet schema 'fcd/1', gefunden {data.get('schema')!r}")
 

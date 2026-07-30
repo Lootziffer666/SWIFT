@@ -507,13 +507,7 @@ def _solve_bake(inp: dict) -> dict:
 
     r = load_builtin(inp["rig"])
     clip = _clip_from_payload(inp["clip"], r.id)
-    tmp = Path(".__vector_combat.json")
-    try:
-        tmp.write_text(json.dumps(inp["combat"]))
-        data = CombatData.load(tmp)
-    finally:
-        tmp.unlink(missing_ok=True)
-    return {"baked": bake_mod.bake(r, clip, data)}
+    return {"baked": bake_mod.bake(r, clip, CombatData.from_dict(inp["combat"]))}
 
 
 @solver("sim")
